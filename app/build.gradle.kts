@@ -22,6 +22,10 @@ android {
 
         val backendBaseUrl = (project.findProperty("JUZISCAN_API_BASE_URL") as String?) ?: "https://api.example.com"
         buildConfigField("String", "JUZISCAN_API_BASE_URL", "\"$backendBaseUrl\"")
+
+        ndk {
+            abiFilters += listOf("arm64-v8a")
+        }
     }
 
     buildTypes {

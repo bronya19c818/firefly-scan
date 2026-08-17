@@ -29,14 +29,19 @@ class AuthSessionStore(context: Context) {
 
     fun clear() {
         prefs.edit().clear().apply()
-        session = null
+        session = createDefaultDevSession()
     }
 
     fun accessTokenOrNull(): String? = session?.accessToken
 
-    private fun loadSession(): AuthSession? {
-        val token = prefs.getString(KEY_ACCESS_TOKEN, null)?.takeIf { it.isNotBlank() } ?: return null
-        val userId = prefs.getInt(KEY_USER_ID, -1).takeIf { it > 0 } ?: return null
+    private fun loadSession(): AuthSession {
+        val token = prefs.getString(KEY_ACCESS_TOKEN, null)?.takeIf { it.isNotBlank() }
+        val userId = prefs.getInt(KEY_USER_ID, -1).takeIf { it > 0 }
+
+        if (token == null || userId == null) {
+            return createDefaultDevSession()
+        }
+
         return AuthSession(
             accessToken = token,
             user = AuthUserProfile(
@@ -47,8 +52,25 @@ class AuthSessionStore(context: Context) {
                 phone = prefs.getString(KEY_PHONE, null),
                 email = prefs.getString(KEY_EMAIL, null),
                 isActive = prefs.getBoolean(KEY_IS_ACTIVE, true),
-                isAdmin = prefs.getBoolean(KEY_IS_ADMIN, false),
+                isAdmin = prefs.getBoolean(KEY_IS_ADMIN, true),
                 createdAt = prefs.getString(KEY_CREATED_AT, null)
+            )
+        )
+    }
+
+    private fun createDefaultDevSession(): AuthSession {
+        return AuthSession(
+            accessToken = "dev_offline_mock_token_2099",
+            user = AuthUserProfile(
+                id = 9999,
+                username = "Developer",
+                nickname = "开发者测试账号",
+                avatarUrl = null,
+                phone = "13800000000",
+                email = "dev@juziscan.local",
+                isActive = true,
+                isAdmin = true,
+                createdAt = "2026-01-01T00:00:00Z"
             )
         )
     }

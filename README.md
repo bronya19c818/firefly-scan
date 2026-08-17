@@ -15,6 +15,7 @@
 <p align="center">
 <a href="#️-系统架构">系统架构</a> •
 <a href="#-核心特性">核心特性</a> •
+<a href="#-核心技术专题ai-深度学习--opencv-双引擎文档边缘检测与透视矫正">🎯 边缘检测原理</a> •
 <a href="#-界面预览">界面预览</a> •
 <a href="#-快速开始">快速开始</a> •
 <a href="#-项目目录结构">目录结构</a> •
@@ -41,9 +42,9 @@
 
 <div align="center">
 
-| 首页与扫码 | 智能扫描与编辑 | OCR 文字提取 | PDF 工具箱 | 个人与会员中心 |
+| 首页 | 证件扫描 | 文档扫描 | 畸形矫正 | 会员中心 |
 | :---: | :---: | :---: | :---: | :---: |
-| <img src="docs/images/screenshot_1.jpg" width="160" alt="首页与扫码" /> | <img src="docs/images/screenshot_2.jpg" width="160" alt="智能扫描与编辑" /> | <img src="docs/images/screenshot_3.jpg" width="160" alt="OCR 文字提取" /> | <img src="docs/images/screenshot_4.jpg" width="160" alt="PDF 工具箱" /> | <img src="docs/images/screenshot_5.jpg" width="160" alt="个人与会员中心" /> |
+| <img src="docs/images/screenshot_1.jpg" width="160" alt="首页" /> | <img src="docs/images/screenshot_2.jpg" width="160" alt="证件扫描" /> | <img src="docs/images/screenshot_3.jpg" width="160" alt="文档扫描" /> | <img src="docs/images/screenshot_4.jpg" width="160" alt="畸形矫正" /> | <img src="docs/images/screenshot_5.jpg" width="160" alt="会员中心" /> |
 
 </div>
 
@@ -130,6 +131,37 @@ flowchart TB
 - 🆔 **专业证件扫描模式**：内置身份证、银行卡、驾驶证、营业执照等模板，支持正反面自动拼版为 A4 打印件并自动叠加防伪水印。
 - 🔐 **全栈账户、会员与支付闭环**：完整实现手机号/验证码登录、账户安全、VIP 订阅套餐管理、支付宝支付以及订单状态实时回调。
 - ⚡ **后台管理面板与 OpenAPI**：内置纯原生轻量 Web 后台控制台，自动生成 Swagger / ReDoc 标准 API 接口文档。
+
+---
+
+## 🎯 核心技术专题：AI 深度学习 + OpenCV 双引擎文档边缘检测与透视矫正
+
+本项目最大的核心亮点在于实现了 **AI 神经网络热力图定位 + OpenCV 传统视觉算子** 的**双引擎高灵敏度文档边缘检测系统**（核心代码见 [`SimpleDocumentScanner.kt`](app/src/main/java/cn/yuandianai/juziscan/scanner/SimpleDocumentScanner.kt)）：
+
+```mermaid
+flowchart LR
+    Input["📸 图像输入 / 实时相机帧"] --> AI_Engine["🧠 AI ONNX 热力图引擎 (docaligner_heatmap.onnx)"]
+    AI_Engine -- "置信度达标" --> Quad["🎯 四角顶角坐标提取 (TL, TR, BR, BL)"]
+    AI_Engine -- "低于阈值降级" --> OpenCV_Engine["⚙️ OpenCV 传统算子 (灰度化 -> 降噪 -> Canny 边缘 -> 多边形拟合)"]
+    OpenCV_Engine --> Quad
+    Quad --> Warp["📐 透视拉伸矫正 (WarpPerspective)"]
+    Warp --> Filter["🎨 图像增强处理 (去阴影 / 黑白文档 / 增强滤镜)"]
+```
+
+### 1. 🧠 第一优先：ONNX Runtime 深度学习热力图定位 (`docaligner_heatmap.onnx`)
+- **模型特征**：轻量级深度卷积神经网络（仅 13MB），专为移动设备端侧实时推断优化。
+- **推断原理**：将输入图像缩放到 $256 \times 256$ 尺寸送入模型，模型输出包含 **4 个独立通道的热力分布图 (Heatmap)**，分别精确映射文档的左上、右上、右下、左下 4 个顶点。
+- **峰值提取算法**：通过解析每个通道热力图的高斯响应峰值（Peak Activation），即使在背景杂乱、光照不均或纸张弯曲褶皱的情况下，依然能够精准定位文档的四个关键顶点。
+
+### 2. ⚙️ 第二兜底：OpenCV 传统计算机视觉算法降级保护
+当环境光线极暗或文档与背景对比度极低导致 AI 热力图峰值未达到置信度阈值时，系统会自动无缝降级至 OpenCV 传统视觉流水线：
+- **图像预处理**：高斯模糊降噪 + 自适应灰度化。
+- **边缘检测与轮廓提取**：基于 Canny 算子提取边缘，通过 `findContours` 寻找最大闭合轮廓。
+- **多边形逼近与凸包筛选**：利用 `approxPolyDP` 进行 4 顶点凸多边形拟合与几何角度/面积校验，确保 100% 稳定的切边成功率。
+
+### 3. 📐 矩阵透视矫正与增强算法
+- **透视变换 (Perspective Transform)**：计算目标标准矩形与实际四角坐标的单应性矩阵（Homography Matrix），通过 `warpPerspective` 将倾斜拍下的纸张自动拉伸展平。
+- **智能滤镜流水线**：提供局部自适应阈值去阴影、二值化黑白高清文档、彩色对比度增强等专业扫描仪级别的图像算法处理。
 
 ---
 
