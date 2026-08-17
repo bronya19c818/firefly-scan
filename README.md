@@ -18,8 +18,13 @@
 <a href="#-界面预览">界面预览</a> •
 <a href="#-快速开始">快速开始</a> •
 <a href="#-项目目录结构">目录结构</a> •
+<<<<<<< HEAD
 <a href="#-后台管理与-api-文档">后台管理</a> •
 <a href="#-开源协议与联系作者">联系作者</a>
+=======
+<a href="#-联系作者与交流">联系作者与交流</a> •
+<a href="#-开源协议">开源协议</a>
+>>>>>>> 0e95cdd (docs: 完善 README 说明文档与 Logo、应用截图、联系方式及 LICENSE 协议)
 </p>
 
 桔子扫描 (JuZiScan) 是一款专为高效办公与个人文档管理打造的 **全栈开源智能文档扫描与处理工作台**。
@@ -207,11 +212,27 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 18001
 ```
 
 后端的 SQLite 数据库会在初次启动时自动创建并完成数据初始化（含默认管理员账号）。
+<<<<<<< HEAD
+=======
+
+---
+
+## 📬 联系作者与交流
+
+如果您在开发、使用或接入过程中遇到任何问题，欢迎通过以下渠道交流与反馈：
+
+- **微信**：csdnxr
+- **QQ**：294323976
+- **邮箱**：[leoucmao@gmail.com](mailto:leoucmao@gmail.com)
+- **Bug 报告与需求建议**：欢迎在 GitHub 提交 [Issues](https://github.com/ucmao/juziscan/issues)
+- **官方仓库**：[JuZiScan Repository](https://github.com/ucmao/juziscan)
+>>>>>>> 0e95cdd (docs: 完善 README 说明文档与 Logo、应用截图、联系方式及 LICENSE 协议)
 
 ---
 
 ## 💻 后台管理与 API 文档
 
+<<<<<<< HEAD
 服务启动后，可以通过浏览器访问以下入口：
 
 - 🖥️ **Web 可视化后台管理面板**：[http://127.0.0.1:18001/](http://127.0.0.1:18001/)
@@ -228,3 +249,7 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 18001
 
 - **GitHub Author**: [@ucmao](https://github.com/ucmao)
 - **Repository**: [ucmao/juziscan](https://github.com/ucmao/juziscan)
+=======
+本项目基于 [MIT License](LICENSE) 协议开源。你可以自由下载、修改和在个人或商业项目中免费使用。
+
+>>>>>>> 0e95cdd (docs: 完善 README 说明文档与 Logo、应用截图、联系方式及 LICENSE 协议)
