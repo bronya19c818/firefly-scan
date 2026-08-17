@@ -6,6 +6,8 @@
 local.properties
 /.idea/
 .kotlin/
+*.apk
+/app/release/
 /build/
 /app/build/
 /captures/
