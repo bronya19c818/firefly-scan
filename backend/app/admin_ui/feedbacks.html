@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>JuZiScan Admin - 意见反馈</title>
+    <link rel="stylesheet" href="/assets/styles.css?v=20260713" />
+  </head>
+  <body>
+    <!-- Dashboard View (Logged In) -->
+    <div class="admin-layout hidden" id="dashboard-view">
+      <!-- Left Sidebar -->
+      <aside class="admin-sidebar">
+        <div class="sidebar-header">
+          <div class="brand">
+            <span class="brand-text">JuZiScan管理后台</span>
+          </div>
+          <button class="collapse-btn" type="button" aria-label="折叠侧边栏" aria-expanded="true" title="折叠侧边栏">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="11 17 6 12 11 7"></polyline>
+              <polyline points="18 17 13 12 18 7"></polyline>
+            </svg>
+          </button>
+        </div>
+
+        <!-- Sidebar Menus -->
+        <nav class="sidebar-menus">
+          <!-- Workspace group -->
+          <div class="menu-group expanded">
+            <div class="group-title">
+              <span>工作台</span>
+              <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
+            </div>
+            <div class="group-items">
+              <a class="menu-item" href="/admin">
+                <svg class="menu-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="3" y="3" width="7" height="9"></rect>
+                  <rect x="14" y="3" width="7" height="5"></rect>
+                  <rect x="14" y="12" width="7" height="9"></rect>
+                  <rect x="3" y="16" width="7" height="5"></rect>
+                </svg>
+                <span>系统概览</span>
+              </a>
+            </div>
+          </div>
+
+          <!-- User center group -->
+          <div class="menu-group expanded">
+            <div class="group-title">
+              <span>用户中台</span>
+              <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
+            </div>
+            <div class="group-items">
+              <a class="menu-item" href="/admin/users">
+                <svg class="menu-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                  <circle cx="9" cy="7" r="4"></circle>
+                  <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                  <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                </svg>
+                <span>用户列表</span>
+              </a>
+              <a class="menu-item" href="/admin/active">
+                <svg class="menu-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M22 12h-4l-3 9L9 3l-3 9H2"></path>
+                </svg>
+                <span>活跃分析</span>
+              </a>
+            </div>
+          </div>
+
+          <!-- Finance group -->
+          <div class="menu-group expanded">
+            <div class="group-title">
+              <span>财务管理</span>
+              <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
+            </div>
+            <div class="group-items">
+              <a class="menu-item" href="/admin/orders">
+                <svg class="menu-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect>
+                  <line x1="1" y1="10" x2="23" y2="10"></line>
+                </svg>
+                <span>订单列表</span>
+              </a>
+              <a class="menu-item" href="/admin/plans">
+                <svg class="menu-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                  <line x1="3" y1="9" x2="21" y2="9"></line>
+                  <line x1="9" y1="21" x2="9" y2="9"></line>
+                </svg>
+                <span>套餐管理</span>
+              </a>
+            </div>
+          </div>
+
+          <!-- Operation group -->
+          <div class="menu-group expanded">
+            <div class="group-title">
+              <span>运营管理</span>
+              <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
+            </div>
+            <div class="group-items">
+              <a class="menu-item active" href="/admin/feedbacks">
+                <svg class="menu-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                </svg>
+                <span>意见反馈</span>
+              </a>
+              <a class="menu-item" href="/admin/sms">
+                <svg class="menu-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="2" y="2" width="20" height="20" rx="2" ry="2"></rect>
+                  <path d="M22 6L12 13 2 6"></path>
+                </svg>
+                <span>短信记录</span>
+              </a>
+              <a class="menu-item" href="/admin/versions">
+                <svg class="menu-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"></path>
+                </svg>
+                <span>版本管理</span>
+              </a>
+            </div>
+          </div>
+        </nav>
+
+        <!-- Sidebar Profile Footer -->
+        <div class="sidebar-footer">
+          <div class="admin-profile">
+            <div class="avatar-circle small" id="admin-avatar">A</div>
+            <div class="profile-info">
+              <strong id="current-admin-name">Admin</strong>
+              <span id="current-admin-email">admin@yuandian.cn</span>
+            </div>
+          </div>
+          <button id="logout-button" class="logout-icon-btn" title="退出登录" type="button">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+              <polyline points="16 17 21 12 16 7"></polyline>
+              <line x1="21" y1="12" x2="9" y2="12"></line>
+            </svg>
+          </button>
+        </div>
+      </aside>
+
+      <!-- Right Main Workspace -->
+      <div class="admin-workspace">
+        <!-- Top Navbar -->
+        <header class="workspace-header">
+          <div class="breadcrumb">
+            <span class="parent-node">运营管理</span>
+            <span class="divider">/</span>
+            <span class="active-node">意见反馈</span>
+          </div>
+        </header>
+
+        <!-- View Panel: Feedbacks -->
+        <main class="workspace-body">
+          <div class="tab-pane active" id="tab-feedbacks">
+            <div class="page-title-block">
+              <h2>用户意见反馈</h2>
+              <p>收集并管理来自产品落地页或端内提交的客诉、BUG及功能建议。</p>
+            </div>
+
+            <!-- Segmented Control for filtering status -->
+            <div class="filter-panel" style="margin-bottom: 20px;">
+              <div class="segmented-control">
+                <button class="segment-btn active" id="segment-feedbacks-all" type="button">
+                  全部 (<span id="badge-feedbacks-all">0</span>)
+                </button>
+                <button class="segment-btn" id="segment-feedbacks-pending" type="button">
+                  待处理 (<span id="badge-feedbacks-pending">0</span>)
+                </button>
+                <button class="segment-btn" id="segment-feedbacks-resolved" type="button">
+                  已解决 (<span id="badge-feedbacks-resolved">0</span>)
+                </button>
+              </div>
+            </div>
+
+            <!-- Table Panel -->
+            <div class="panel">
+              <div class="table-responsive">
+                <table class="data-table">
+                  <thead>
+                    <tr>
+                      <th style="width: 80px;">工单ID</th>
+                      <th>反馈内容</th>
+                      <th style="width: 160px;">用户关联</th>
+                      <th style="width: 180px;">联系方式</th>
+                      <th style="width: 100px;">处理状态</th>
+                      <th style="width: 180px;">提交时间</th>
+                      <th class="align-right" style="width: 100px;">操作</th>
+                    </tr>
+                  </thead>
+                  <tbody id="feedbacks-table"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </main>
+      </div>
+    </div>
+
+    <script src="/assets/app.js?v=20260713-2"></script>
+  </body>
+</html>

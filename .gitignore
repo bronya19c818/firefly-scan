@@ -1,0 +1,37 @@
+# Android / Gradle
+*.iml
+.gradle/
+.gradle-local/
+/local.properties
+local.properties
+/.idea/
+.kotlin/
+/build/
+/app/build/
+/captures/
+.externalNativeBuild/
+.cxx/
+output/
+tmp/
+
+# Python / FastAPI Backend
+backend/.venv/
+backend/.env
+backend/__pycache__/
+backend/*/__pycache__/
+backend/*/*/__pycache__/
+backend/*.db
+backend/*.sqlite3
+backend/logs/*.log
+!backend/logs/.gitkeep
+backend/storage/*.png
+backend/storage/*.jpg
+backend/storage/avatars/*.png
+backend/storage/avatars/*.jpg
+!backend/storage/avatars/.gitkeep
+backend/.pytest_cache/
+
+# OS / Editor
+.DS_Store
+*.swp
+*.bak

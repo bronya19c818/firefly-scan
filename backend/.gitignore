@@ -1,0 +1,9 @@
+.venv/
+.env
+*.db
+__pycache__/
+*.pyc
+logs/*.log
+logs/*.log.*
+storage/avatars/*
+!storage/avatars/.gitkeep

@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>JuZiScan Admin - 短信记录</title>
+    <link rel="stylesheet" href="/assets/styles.css?v=20260713-2" />
+  </head>
+  <body>
+    <!-- Dashboard View (Logged In) -->
+    <div class="admin-layout hidden" id="dashboard-view">
+      <!-- Left Sidebar -->
+      <aside class="admin-sidebar">
+        <div class="sidebar-header">
+          <div class="brand">
+            <span class="brand-text">JuZiScan管理后台</span>
+          </div>
+          <button class="collapse-btn" type="button" aria-label="折叠侧边栏" aria-expanded="true" title="折叠侧边栏">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="11 17 6 12 11 7"></polyline>
+              <polyline points="18 17 13 12 18 7"></polyline>
+            </svg>
+          </button>
+        </div>
+
+        <!-- Sidebar Menus -->
+        <nav class="sidebar-menus">
+          <!-- Workspace group -->
+          <div class="menu-group expanded">
+            <div class="group-title">
+              <span>工作台</span>
+              <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
+            </div>
+            <div class="group-items">
+              <a class="menu-item" href="/admin">
+                <svg class="menu-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="3" y="3" width="7" height="9"></rect>
+                  <rect x="14" y="3" width="7" height="5"></rect>
+                  <rect x="14" y="12" width="7" height="9"></rect>
+                  <rect x="3" y="16" width="7" height="5"></rect>
+                </svg>
+                <span>系统概览</span>
+              </a>
+            </div>
+          </div>
+
+          <!-- User center group -->
+          <div class="menu-group expanded">
+            <div class="group-title">
+              <span>用户中台</span>
+              <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
+            </div>
+            <div class="group-items">
+              <a class="menu-item" href="/admin/users">
+                <svg class="menu-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                  <circle cx="9" cy="7" r="4"></circle>
+                  <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                  <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                </svg>
+                <span>用户列表</span>
+              </a>
+              <a class="menu-item" href="/admin/active">
+                <svg class="menu-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M22 12h-4l-3 9L9 3l-3 9H2"></path>
+                </svg>
+                <span>活跃分析</span>
+              </a>
+            </div>
+          </div>
+
+          <!-- Finance group -->
+          <div class="menu-group expanded">
+            <div class="group-title">
+              <span>财务管理</span>
+              <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
+            </div>
+            <div class="group-items">
+              <a class="menu-item" href="/admin/orders">
+                <svg class="menu-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect>
+                  <line x1="1" y1="10" x2="23" y2="10"></line>
+                </svg>
+                <span>订单列表</span>
+              </a>
+              <a class="menu-item" href="/admin/plans">
+                <svg class="menu-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                  <line x1="3" y1="9" x2="21" y2="9"></line>
+                  <line x1="9" y1="21" x2="9" y2="9"></line>
+                </svg>
+                <span>套餐管理</span>
+              </a>
+            </div>
+          </div>
+
+          <!-- Operation group -->
+          <div class="menu-group expanded">
+            <div class="group-title">
+              <span>运营管理</span>
+              <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
+            </div>
+            <div class="group-items">
+              <a class="menu-item" href="/admin/feedbacks">
+                <svg class="menu-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                </svg>
+                <span>意见反馈</span>
+              </a>
+              <a class="menu-item active" href="/admin/sms">
+                <svg class="menu-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="2" y="2" width="20" height="20" rx="2" ry="2"></rect>
+                  <path d="M22 6L12 13 2 6"></path>
+                </svg>
+                <span>短信记录</span>
+              </a>
+              <a class="menu-item" href="/admin/versions">
+                <svg class="menu-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"></path>
+                </svg>
+                <span>版本管理</span>
+              </a>
+            </div>
+          </div>
+        </nav>
+
+        <!-- Sidebar Profile Footer -->
+        <div class="sidebar-footer">
+          <div class="admin-profile">
+            <div class="avatar-circle small" id="admin-avatar">A</div>
+            <div class="profile-info">
+              <strong id="current-admin-name">Admin</strong>
+              <span id="current-admin-email">admin@yuandian.cn</span>
+            </div>
+          </div>
+          <button id="logout-button" class="logout-icon-btn" title="退出登录" type="button">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+              <polyline points="16 17 21 12 16 7"></polyline>
+              <line x1="21" y1="12" x2="9" y2="12"></line>
+            </svg>
+          </button>
+        </div>
+      </aside>
+
+      <!-- Right Main Workspace -->
+      <div class="admin-workspace">
+        <!-- Top Navbar -->
+        <header class="workspace-header">
+          <div class="breadcrumb">
+            <span class="parent-node">运营管理</span>
+            <span class="divider">/</span>
+            <span class="active-node">短信记录</span>
+          </div>
+        </header>
+
+        <!-- View Panel: SMS Logs -->
+        <main class="workspace-body">
+          <div class="tab-pane active" id="tab-sms">
+            <div class="page-title-block">
+              <h2>短信发送记录</h2>
+              <p>监控及排查系统发送的短信验证码明细、腾讯云回执状态和用户验证效率。</p>
+            </div>
+
+            <!-- Filter Panel -->
+            <fieldset class="filter-panel">
+              <div class="filter-row">
+                <label class="filter-item">
+                  <span>关键字搜索</span>
+                  <input id="sms-filter-search" type="text" placeholder="手机号 / 请求 IP" />
+                </label>
+                <label class="filter-item">
+                  <span>每页条数</span>
+                  <select id="sms-limit">
+                    <option value="20">20 条 / 页</option>
+                    <option value="50" selected>50 条 / 页</option>
+                    <option value="100">100 条 / 页</option>
+                  </select>
+                </label>
+              </div>
+              <div class="filter-actions">
+                <button id="search-sms-button" class="btn-primary" type="button">筛选</button>
+                <button id="reset-sms-button" class="btn-default" type="button">重置</button>
+              </div>
+            </fieldset>
+
+            <!-- Segmented Control & Status Filtering -->
+            <div class="action-bar" style="margin-top: 20px;">
+              <div class="segmented-control" id="sms-status-tabs">
+                <button class="segment active" data-status="all" type="button">全部 <span class="badge" id="badge-sms-all">0</span></button>
+                <button class="segment" data-status="success" type="button">发送成功 <span class="badge" id="badge-sms-success">0</span></button>
+                <button class="segment" data-status="failed" type="button">发送失败 <span class="badge" id="badge-sms-failed">0</span></button>
+                <button class="segment" data-status="pending" type="button">发送中 <span class="badge" id="badge-sms-pending">0</span></button>
+              </div>
+            </div>
+
+            <!-- Table Panel -->
+            <div class="panel" style="margin-top: 15px;">
+              <div class="table-wrap">
+                <table class="data-table">
+                  <thead>
+                    <tr>
+                      <th style="width: 170px;">发送时间</th>
+                      <th style="width: 130px;">手机号</th>
+                      <th style="width: 100px;">用途</th>
+                      <th style="width: 100px;">发送状态</th>
+                      <th>结果/提示</th>
+                      <th style="width: 130px;">请求 IP</th>
+                      <th style="width: 80px;">重试</th>
+                      <th style="width: 90px;">使用状态</th>
+                    </tr>
+                  </thead>
+                  <tbody id="sms-table-body">
+                    <tr>
+                      <td colspan="8" style="text-align: center; color: var(--text-secondary); padding: 24px 0;">正在加载中...</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <!-- Pagination Bar -->
+            <div style="margin-top: 16px; display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap;">
+              <span id="sms-page-info" style="font-size: 13.5px; color: #595959;">共 0 条记录，当前第 1 页</span>
+              <div style="display: flex; gap: 8px;">
+                <button id="prev-sms-page" class="btn-default" type="button" disabled style="padding: 6px 12px; font-size: 13px;">上一页</button>
+                <button id="next-sms-page" class="btn-default" type="button" disabled style="padding: 6px 12px; font-size: 13px;">下一页</button>
+              </div>
+            </div>
+
+          </div>
+        </main>
+      </div>
+    </div>
+
+    <script src="/assets/app.js?v=20260713-2"></script>
+  </body>
+</html>
