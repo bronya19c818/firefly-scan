@@ -8,6 +8,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
@@ -35,6 +36,8 @@ import androidx.compose.ui.input.pointer.PointerInputScope
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
@@ -227,9 +230,8 @@ fun ShutterButton(
     Box(
         modifier = Modifier
             .size(96.dp)
-            .pointerInput(isCapturing, enabled) {
-                if (!isCapturing && enabled) detectTapGesturesCompat(onClick)
-            },
+            .semantics { contentDescription = "拍摄" }
+            .clickable(enabled = !isCapturing && enabled, onClick = onClick),
         contentAlignment = Alignment.Center
     ) {
         Canvas(modifier = Modifier.fillMaxSize()) {

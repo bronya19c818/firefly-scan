@@ -158,7 +158,7 @@ data class ExportWatermarkSettings(
 }
 
 enum class CaptureModeOption(val label: String) {
-    Manual("手动拍"),
+    Manual("智能手拍"),
     Auto("自动拍")
 }
 
