@@ -216,11 +216,11 @@ fun CameraCaptureScreen(
                     )
                 }
 
-                if (captureMode == CaptureModeOption.Auto && autoCaptureUiState.liveQuad.size == 4) {
+                if (captureTask == CaptureTask.Document && autoCaptureUiState.liveQuad.size == 4) {
                     LiveDocumentShadowOverlay(
                         quad = autoCaptureUiState.liveQuad,
                         isStable = autoCaptureUiState.isStable,
-                        progress = autoCaptureUiState.stableProgress,
+                        progress = if (captureMode == CaptureModeOption.Auto) autoCaptureUiState.stableProgress else 0f,
                         modifier = Modifier.fillMaxSize()
                     )
                 }
@@ -241,7 +241,7 @@ fun CameraCaptureScreen(
                         contentAlignment = Alignment.BottomCenter
                     ) {
                         BubbleHint(
-                            text = if (captureMode == CaptureModeOption.Auto) {
+                            text = if (captureTask == CaptureTask.Document) {
                                 autoCaptureUiState.hintText
                             } else {
                                 screenSubtitle
@@ -301,7 +301,7 @@ fun CameraCaptureScreen(
                         onClick = onCaptureClick
                     )
 
-                    if (showCapturedPreview && captureMode == CaptureModeOption.Auto && latestPreviewBitmap != null && capturedCount > 0) {
+                    if (showCapturedPreview && latestPreviewBitmap != null && capturedCount > 0) {
                         Box(
                             modifier = Modifier.align(Alignment.CenterEnd)
                         ) {

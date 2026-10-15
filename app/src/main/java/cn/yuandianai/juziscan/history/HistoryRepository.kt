@@ -2,6 +2,7 @@ package cn.yuandianai.juziscan.history
 
 import android.content.Context
 import android.content.ClipData
+import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
@@ -180,10 +181,13 @@ class HistoryRepository(private val context: Context) {
             clipData = ClipData.newUri(context.contentResolver, displayName, uri)
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
         }
-        check(intent.resolveActivity(context.packageManager) != null) {
-            "未找到可预览此类文件的应用"
+        // Starting an activity does not require package visibility. A preflight
+        // resolveActivity() can hide installed PDF viewers on Android 11+.
+        try {
+            context.startActivity(intent)
+        } catch (error: ActivityNotFoundException) {
+            throw IllegalStateException("未找到可预览此类文件的应用", error)
         }
-        context.startActivity(intent)
     }
 
     private fun prepareExternalFile(record: HistoryRecord): Pair<String, android.net.Uri> {

@@ -58,6 +58,13 @@ class ScanViewModel {
     val isVipMember: Boolean
         get() = membershipStatus?.is_vip == true
 
+    // Called on the main thread before submitting a CameraX request.
+    fun tryBeginCapture(): Boolean {
+        if (stage != ScanStage.Capture || isCapturing || isProcessingPreview) return false
+        isCapturing = true
+        return true
+    }
+
     fun clearEditingState() {
         sourceBitmap = null
         reviewBitmap = null
@@ -80,7 +87,7 @@ class ScanViewModel {
     }
 
     fun resetAutoCaptureHint() {
-        autoCaptureUiState = if (captureMode == CaptureModeOption.Auto && currentTask.supportsAutoCapture) {
+        autoCaptureUiState = if (currentTask == CaptureTask.Document) {
             AutoCaptureUiState(
                 hintText = "将文档放入取景框内",
                 stableProgress = 0f,

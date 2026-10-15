@@ -5,6 +5,7 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.ImageFormat
 import android.graphics.PointF
+import android.os.SystemClock
 import android.graphics.Rect as AndroidRect
 import android.graphics.YuvImage
 import android.util.Log
@@ -15,11 +16,14 @@ import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.ImageCapture
 import androidx.camera.core.ImageProxy
 import androidx.camera.core.Preview
+import androidx.camera.core.UseCaseGroup
 import androidx.camera.core.resolutionselector.AspectRatioStrategy
 import androidx.camera.core.resolutionselector.ResolutionSelector
 import androidx.camera.core.resolutionselector.ResolutionStrategy
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
+import androidx.camera.view.transform.CoordinateTransform
+import androidx.camera.view.transform.ImageProxyTransformFactory
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.LifecycleOwner
 import cn.yuandianai.juziscan.scanner.SimpleDocumentScanner
@@ -49,7 +53,11 @@ class AutoCaptureStabilityTracker(
         stableSinceMs = null
     }
 
-    fun update(nowMs: Long, quad: List<PointF>): AutoCaptureAnalysisResult {
+    fun update(
+        nowMs: Long,
+        quad: List<PointF>,
+        autoCaptureEnabled: Boolean = true
+    ): AutoCaptureAnalysisResult {
         if (quad.size != 4 || quadArea(quad) < 0.18f) {
             reset()
             return AutoCaptureAnalysisResult(
@@ -78,13 +86,15 @@ class AutoCaptureStabilityTracker(
 
         val stableForMs = nowMs - (stableSinceMs ?: nowMs)
         val progress = (stableForMs / stableThresholdMs.toFloat()).coerceIn(0f, 1f)
-        val shouldCapture = progress >= 1f && (nowMs - lastCaptureAtMs) >= captureCooldownMs
+        val shouldCapture = autoCaptureEnabled && progress >= 1f &&
+            (nowMs - lastCaptureAtMs) >= captureCooldownMs
         if (shouldCapture) {
             lastCaptureAtMs = nowMs
             stableSinceMs = nowMs
         }
 
         val hint = when {
+            !autoCaptureEnabled -> "已识别文档，点击快门拍摄"
             shouldCapture -> "已识别稳定文档，正在自动拍照"
             progress > 0f -> "保持稳定，准备自动拍照"
             else -> "已识别文档，保持稳定即可自动拍照"
@@ -93,7 +103,7 @@ class AutoCaptureStabilityTracker(
         return AutoCaptureAnalysisResult(
             uiState = AutoCaptureUiState(
                 hintText = hint,
-                stableProgress = progress,
+                stableProgress = if (autoCaptureEnabled) progress else 0f,
                 documentDetected = true,
                 liveQuad = quad,
                 isStable = progress > 0f
@@ -103,12 +113,14 @@ class AutoCaptureStabilityTracker(
     }
 }
 
+@androidx.annotation.OptIn(markerClass = [androidx.camera.view.TransformExperimental::class])
 fun bindCameraUseCases(
     context: Context,
     lifecycleOwner: LifecycleOwner,
     previewView: PreviewView,
     flashMode: FlashModeOption,
     captureMode: CaptureModeOption,
+    captureTask: CaptureTask,
     analysisExecutor: ExecutorService,
     onAutoCaptureState: (AutoCaptureUiState) -> Unit,
     shouldAnalyze: () -> Boolean,
@@ -139,7 +151,7 @@ fun bindCameraUseCases(
         }
     val autoTracker = AutoCaptureStabilityTracker()
 
-    val analysis = if (captureMode == CaptureModeOption.Auto) {
+    val analysis = if (captureTask == CaptureTask.Document) {
         ImageAnalysis.Builder()
             .setTargetAspectRatio(AspectRatio.RATIO_4_3)
             .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
@@ -164,7 +176,7 @@ fun bindCameraUseCases(
                             return@setAnalyzer
                         }
 
-                        val nowMs = System.currentTimeMillis()
+                        val nowMs = SystemClock.elapsedRealtime()
                         if (!autoTracker.shouldAnalyze(nowMs)) return@setAnalyzer
 
                         val bitmap = imageProxyToBitmap(image)
@@ -175,7 +187,7 @@ fun bindCameraUseCases(
                             mainExecutor.execute {
                                 onAutoCaptureState(
                                     AutoCaptureUiState(
-                                        hintText = "正在准备自动拍照",
+                                        hintText = "点击快门拍摄当前页面",
                                         stableProgress = 0f,
                                         documentDetected = false
                                     )
@@ -192,20 +204,40 @@ fun bindCameraUseCases(
                             context,
                             preparedForAnalysis
                         ) ?: emptyList()
-                        val result = autoTracker.update(nowMs, quad)
+                        val result = autoTracker.update(
+                            nowMs, quad, autoCaptureEnabled = captureMode == CaptureModeOption.Auto
+                        )
+                        // Detection uses the entire rotated buffer; CameraX maps it to
+                        // the shared viewport, including PreviewView's FILL_CENTER crop.
+                        val sourceTransform = ImageProxyTransformFactory().apply {
+                            isUsingRotationDegrees = true
+                        }.getOutputTransform(image)
+                        val points = result.uiState.liveQuad.flatMap { point ->
+                            listOf(point.x * rotated.width, point.y * rotated.height)
+                        }.toFloatArray()
                         mainExecutor.execute {
-                            onAutoCaptureState(result.uiState)
-                            if (result.shouldCapture) {
+                            if (!shouldAnalyze()) return@execute
+                            val targetTransform = previewView.outputTransform
+                            val mappedQuad = if (targetTransform != null && points.size == 8 &&
+                                previewView.width > 0 && previewView.height > 0
+                            ) {
+                                CoordinateTransform(sourceTransform, targetTransform).mapPoints(points)
+                                points.asList().chunked(2).map { (x, y) ->
+                                    PointF(x / previewView.width, y / previewView.height)
+                                }
+                            } else emptyList()
+                            onAutoCaptureState(result.uiState.copy(liveQuad = mappedQuad))
+                            if (captureMode == CaptureModeOption.Auto && result.shouldCapture) {
                                 onAutoCaptureRequest()
                             }
                         }
                     } catch (t: Throwable) {
-                        Log.w("JuZiScan", "Auto analysis failed", t)
+                        Log.w("JuZiScan", "Document analysis failed", t)
                         autoTracker.reset()
                         mainExecutor.execute {
                             onAutoCaptureState(
                                 AutoCaptureUiState(
-                                    hintText = "自动识别中，请稍候",
+                                    hintText = "未识别到文档，可直接点击快门拍摄",
                                     stableProgress = 0f,
                                     documentDetected = false
                                 )
@@ -230,12 +262,16 @@ fun bindCameraUseCases(
 
     cameraProvider.unbindAll()
     if (analysis != null) {
+        val group = UseCaseGroup.Builder()
+            .addUseCase(preview)
+            .addUseCase(imageCapture)
+            .addUseCase(analysis)
+            .setViewPort(requireNotNull(previewView.viewPort))
+            .build()
         cameraProvider.bindToLifecycle(
             lifecycleOwner,
             CameraSelector.DEFAULT_BACK_CAMERA,
-            preview,
-            imageCapture,
-            analysis
+            group
         )
     } else {
         cameraProvider.bindToLifecycle(

@@ -56,7 +56,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -73,6 +72,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import androidx.core.view.doOnLayout
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import cn.yuandianai.juziscan.history.HistoryRecord
@@ -103,6 +103,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.foundation.clickable
 import java.util.concurrent.Executors
+import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.launch
@@ -355,6 +356,16 @@ private fun ScannerFlowScreen(
     val captureExecutor = remember { Executors.newSingleThreadExecutor() }
     val scope = rememberCoroutineScope()
     val vm = remember { ScanViewModel() }
+    var cameraResumed by remember(lifecycleOwner) {
+        mutableStateOf(lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED))
+    }
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, _ ->
+            cameraResumed = lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
     val historyRepository = remember(context) { HistoryRepository(context.applicationContext) }
     val authSessionStore = remember(context) { AuthSessionStore(context.applicationContext) }
     val settingsPrefs = remember(context) {
@@ -433,10 +444,6 @@ private fun ScannerFlowScreen(
 
     with(vm) {
         val currentSession = authSessionStore.session
-        val latestCaptureMode by rememberUpdatedState(captureMode)
-        val latestCurrentTask by rememberUpdatedState(currentTask)
-        val latestIsCapturing by rememberUpdatedState(isCapturing)
-        val latestIsProcessingPreview by rememberUpdatedState(isProcessingPreview)
 
         fun clearEditorAfterUse() {
             sourceBitmap = null
@@ -684,20 +691,24 @@ private fun ScannerFlowScreen(
             }
         }
 
-        fun handleAutoDocumentCapture(bitmap: Bitmap) {
+        fun handleDocumentCapture(bitmap: Bitmap, preview: Bitmap) {
             val newPage = ScannedPage(
                 sourceBitmap = bitmap,
-                previewBitmap = preparePreviewBitmap(bitmap)
+                previewBitmap = preview
             )
-            val updatedPages = pages + newPage
+            val replacement = replacingIndex
+            val updatedPages = if (replacement != null && replacement in pages.indices) {
+                pages.mapIndexed { index, page -> if (index == replacement) newPage else page }
+            } else pages + newPage
             pages = updatedPages
-            activeIndex = updatedPages.lastIndex
+            activeIndex = replacement?.coerceIn(0, updatedPages.lastIndex) ?: updatedPages.lastIndex
+            replacingIndex = null
             autoCaptureUiState = AutoCaptureUiState(
-                hintText = "已自动拍摄第 ${updatedPages.size} 页，请放入下一页",
+                hintText = "已拍摄 ${updatedPages.size} 页，请放入下一页",
                 stableProgress = 0f,
                 documentDetected = false
             )
-            Toast.makeText(context, "已自动拍摄第 ${updatedPages.size} 页", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, "已拍摄 ${updatedPages.size} 页", Toast.LENGTH_SHORT).show()
         }
 
         fun idCardCaptureTargetCount(): Int = selectedIdCardLayout.captureCount
@@ -808,7 +819,7 @@ private fun ScannerFlowScreen(
         }
 
         fun openPreviewAt(index: Int) {
-            if (pages.isEmpty()) return
+            if (pages.isEmpty() || isCapturing || isProcessingPreview) return
             isProcessingPreview = true
             val targetIndex = index.coerceIn(0, pages.lastIndex)
             activeIndex = targetIndex
@@ -961,42 +972,63 @@ private fun ScannerFlowScreen(
         }
 
         fun triggerCapture() {
-            if (isCapturing || isProcessingPreview) return
             val capture = imageCapture ?: return
-            isCapturing = true
-            capture.takePicture(
-                captureExecutor,
-                object : ImageCapture.OnImageCapturedCallback() {
-                    override fun onCaptureSuccess(image: ImageProxy) {
-                        try {
-                            val rotationDegrees = image.imageInfo.rotationDegrees.toFloat()
-                            val bitmap = imageProxyToBitmap(image, SCAN_INPUT_MAX_SIDE)
-                            if (bitmap == null) {
+            if (!lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) return
+            if (!tryBeginCapture()) return
+            val taskAtCapture = currentTask
+            try {
+                capture.takePicture(
+                    captureExecutor,
+                    object : ImageCapture.OnImageCapturedCallback() {
+                        override fun onCaptureSuccess(image: ImageProxy) {
+                            try {
+                                val rotationDegrees = image.imageInfo.rotationDegrees.toFloat()
+                                val bitmap = imageProxyToBitmap(image, SCAN_INPUT_MAX_SIDE)
+                                if (bitmap == null) {
+                                    mainExecutor.execute {
+                                        isCapturing = false
+                                        Toast.makeText(context, "拍照失败，请重试", Toast.LENGTH_SHORT).show()
+                                    }
+                                    return
+                                }
+
+                                val rotated = SimpleDocumentScanner.rotate(bitmap, rotationDegrees)
+                                if (rotated !== bitmap && !bitmap.isRecycled) {
+                                    bitmap.recycle()
+                                }
+                                val thumbnail = if (taskAtCapture == CaptureTask.Document) {
+                                    preparePreviewBitmap(rotated)
+                                } else null
                                 mainExecutor.execute {
                                     isCapturing = false
-                                    Toast.makeText(context, "拍照失败，请重试", Toast.LENGTH_SHORT).show()
+                                    if (stage != ScanStage.Capture || currentTask != taskAtCapture) {
+                                        thumbnail?.takeIf { it !== rotated && !it.isRecycled }?.recycle()
+                                        if (!rotated.isRecycled) rotated.recycle()
+                                    } else if (taskAtCapture.entry == ScanEntry.IdCard) {
+                                        handleIdCardCapture(rotated)
+                                    } else if (taskAtCapture == CaptureTask.Document) {
+                                        handleDocumentCapture(rotated, requireNotNull(thumbnail))
+                                    } else {
+                                        pushBitmapToEdgeReview(rotated)
+                                    }
                                 }
-                                return
+                            } catch (t: Throwable) {
+                                Log.e("JuZiScan", "onCaptureSuccess failed", t)
+                                mainExecutor.execute {
+                                    isCapturing = false
+                                    Toast.makeText(
+                                        context,
+                                        "拍照失败，请重试",
+                                        Toast.LENGTH_LONG
+                                    ).show()
+                                }
+                            } finally {
+                                runCatching { image.close() }
                             }
+                        }
 
-                            val rotated = SimpleDocumentScanner.rotate(bitmap, rotationDegrees)
-                            if (rotated !== bitmap && !bitmap.isRecycled) {
-                                bitmap.recycle()
-                            }
-                            mainExecutor.execute {
-                                isCapturing = false
-                                if (latestCurrentTask.entry == ScanEntry.IdCard) {
-                                    handleIdCardCapture(rotated)
-                                } else if (latestCurrentTask == CaptureTask.Document &&
-                                    latestCaptureMode == CaptureModeOption.Auto
-                                ) {
-                                    handleAutoDocumentCapture(rotated)
-                                } else {
-                                    pushBitmapToEdgeReview(rotated)
-                                }
-                            }
-                        } catch (t: Throwable) {
-                            Log.e("JuZiScan", "onCaptureSuccess failed", t)
+                        override fun onError(exception: ImageCaptureException) {
+                            Log.e("JuZiScan", "ImageCapture onError", exception)
                             mainExecutor.execute {
                                 isCapturing = false
                                 Toast.makeText(
@@ -1005,24 +1037,14 @@ private fun ScannerFlowScreen(
                                     Toast.LENGTH_LONG
                                 ).show()
                             }
-                        } finally {
-                            runCatching { image.close() }
                         }
                     }
-
-                    override fun onError(exception: ImageCaptureException) {
-                        Log.e("JuZiScan", "ImageCapture onError", exception)
-                        mainExecutor.execute {
-                            isCapturing = false
-                            Toast.makeText(
-                                context,
-                                "拍照失败，请重试",
-                                Toast.LENGTH_LONG
-                            ).show()
-                        }
-                    }
-                }
-            )
+                )
+            } catch (error: Exception) {
+                isCapturing = false
+                Log.e("JuZiScan", "Unable to start capture", error)
+                Toast.makeText(context, "拍照失败，请重试", Toast.LENGTH_SHORT).show()
+            }
         }
 
         val multiPhotoPickerLauncher = rememberLauncherForActivityResult(
@@ -1376,7 +1398,7 @@ private fun ScannerFlowScreen(
                             selectedIdCardDocumentType = selectedIdCardDocumentType,
                             selectedIdCardLayout = selectedIdCardLayout,
                             onModeSelected = {
-                                if (!currentTask.supportsAutoCapture) return@CameraCaptureScreen
+                                if (!currentTask.supportsAutoCapture || isCapturing || isProcessingPreview) return@CameraCaptureScreen
                                 captureMode = it
                                 resetAutoCaptureHint()
                             },
@@ -1396,6 +1418,7 @@ private fun ScannerFlowScreen(
                                 }
                             },
                             onCloseClick = {
+                                if (isCapturing || isProcessingPreview) return@CameraCaptureScreen
                                 when {
                                     replacingIndex != null -> {
                                         replacingIndex = null
@@ -1558,17 +1581,28 @@ private fun ScannerFlowScreen(
 
                 ScanStage.Preview -> {
                     if (pages.isNotEmpty()) {
-                        LaunchedEffect(pages.map { it.id }, currentDocumentRecordId) {
-                            if (currentDocumentRecordId == null) {
-                                runCatching {
-                                    withContext(Dispatchers.IO) {
-                                        historyRepository.saveDocumentRecord(pages)
+                        LaunchedEffect(pages.map { it.id to it.processedBitmap }, currentDocumentRecordId) {
+                            if (currentDocumentRecordId == null &&
+                                pages.all { it.processedBitmap != null }
+                            ) {
+                                val pagesToSave = pages
+                                isProcessingPreview = true
+                                processingMessage = "正在保存扫描记录…"
+                                try {
+                                    runCatching {
+                                        withContext(Dispatchers.IO) {
+                                            historyRepository.saveDocumentRecord(pagesToSave)
+                                        }
+                                    }.onSuccess { record ->
+                                        currentDocumentRecordId = record.id
+                                        refreshHistoryRecords()
+                                    }.onFailure { error ->
+                                        Log.e("JuZiScan", "Save document history failed", error)
+                                        Toast.makeText(context, "扫描记录保存失败，请重试", Toast.LENGTH_SHORT).show()
                                     }
-                                }.onSuccess { record ->
-                                    currentDocumentRecordId = record.id
-                                    refreshHistoryRecords()
-                                }.onFailure { error ->
-                                    Log.e("JuZiScan", "Save document history failed", error)
+                                } finally {
+                                    isProcessingPreview = false
+                                    processingMessage = "正在处理…"
                                 }
                             }
                         }
@@ -1863,9 +1897,14 @@ private fun ScannerFlowScreen(
                 }
             }
 
-            DisposableEffect(previewView, lifecycleOwner, stage, captureMode, flashMode, currentTask, hasCameraPermission) {
+            DisposableEffect(previewView, lifecycleOwner, stage, captureMode, currentTask, hasCameraPermission, cameraResumed) {
                 val view = previewView
-                val cameraProviderFuture = if (view != null && stage == ScanStage.Capture && hasCameraPermission) {
+                val bindingActive = AtomicBoolean(true)
+                val boundMode = captureMode
+                val boundTask = currentTask
+                val cameraProviderFuture = if (view != null && stage == ScanStage.Capture &&
+                    hasCameraPermission && cameraResumed
+                ) {
                     ProcessCameraProvider.getInstance(context)
                 } else {
                     null
@@ -1873,37 +1912,54 @@ private fun ScannerFlowScreen(
 
                 if (view != null && cameraProviderFuture != null) {
                     val listener = Runnable {
-                        imageCapture = bindCameraUseCases(
-                            context = context,
-                            lifecycleOwner = lifecycleOwner,
-                            previewView = view,
-                            flashMode = flashMode,
-                            captureMode = captureMode,
-                            analysisExecutor = analysisExecutor,
-                            onAutoCaptureState = { state ->
-                                autoCaptureUiState = state
-                            },
-                            shouldAnalyze = {
-                                latestCurrentTask.supportsAutoCapture &&
-                                    latestCaptureMode == CaptureModeOption.Auto &&
-                                    !latestIsCapturing &&
-                                    !latestIsProcessingPreview
-                            },
-                            onAutoCaptureRequest = {
-                                if (latestCurrentTask.supportsAutoCapture &&
-                                    latestCaptureMode == CaptureModeOption.Auto &&
-                                    !latestIsCapturing &&
-                                    !latestIsProcessingPreview
-                                ) {
-                                    triggerCapture()
-                                }
+                        view.doOnLayout {
+                            if (!bindingActive.get()) return@doOnLayout
+                            resetAutoCaptureHint()
+                            runCatching {
+                                imageCapture = bindCameraUseCases(
+                                    context = context,
+                                    lifecycleOwner = lifecycleOwner,
+                                    previewView = view,
+                                    flashMode = flashMode,
+                                    captureMode = boundMode,
+                                    captureTask = boundTask,
+                                    analysisExecutor = analysisExecutor,
+                                    onAutoCaptureState = { state ->
+                                        if (bindingActive.get() && stage == ScanStage.Capture &&
+                                            captureMode == boundMode && currentTask == boundTask &&
+                                            lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)
+                                        ) autoCaptureUiState = state
+                                    },
+                                    shouldAnalyze = {
+                                        bindingActive.get() && stage == ScanStage.Capture &&
+                                            currentTask == CaptureTask.Document && currentTask == boundTask &&
+                                            captureMode == boundMode && !isCapturing && !isProcessingPreview &&
+                                            lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)
+                                    },
+                                    onAutoCaptureRequest = {
+                                        if (bindingActive.get() && stage == ScanStage.Capture &&
+                                            boundMode == CaptureModeOption.Auto &&
+                                            currentTask == CaptureTask.Document &&
+                                            captureMode == CaptureModeOption.Auto &&
+                                            !isCapturing && !isProcessingPreview
+                                        ) {
+                                            triggerCapture()
+                                        }
+                                    }
+                                )
+                            }.onFailure { error ->
+                                imageCapture = null
+                                Log.e("JuZiScan", "Camera binding failed", error)
+                                Toast.makeText(context, "相机启动失败，请返回后重试", Toast.LENGTH_SHORT).show()
                             }
-                        )
+                        }
                     }
                     cameraProviderFuture.addListener(listener, mainExecutor)
                 }
 
                 onDispose {
+                    bindingActive.set(false)
+                    imageCapture = null
                     if (cameraProviderFuture != null) {
                         runCatching { cameraProviderFuture.get().unbindAll() }
                     }
@@ -1914,7 +1970,8 @@ private fun ScannerFlowScreen(
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .background(Color.Black.copy(alpha = 0.42f)),
+                        .background(Color.Black.copy(alpha = 0.42f))
+                        .clickable { },
                     contentAlignment = Alignment.Center
                 ) {
                     Column(
