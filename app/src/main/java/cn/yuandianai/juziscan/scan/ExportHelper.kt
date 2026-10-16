@@ -146,14 +146,18 @@ fun executePrint(
         throw IllegalArgumentException("没有可打印的文档")
     }
 
-    val printManager = context.getSystemService(Context.PRINT_SERVICE) as? PrintManager
-        ?: throw IllegalStateException("当前设备不支持系统打印")
-
     val pdfFile = File(context.cacheDir, "$fileName-print.pdf")
     pdfFile.outputStream().use { out ->
         writePdfToStream(out, pages, fileSize)
     }
 
+    executePrintFile(context, pdfFile, fileName)
+}
+
+/** Takes ownership of a disposable PDF snapshot until the system finishes the print task. */
+fun executePrintFile(context: Context, pdfFile: File, fileName: String) {
+    val printManager = context.getSystemService(Context.PRINT_SERVICE) as? PrintManager
+        ?: throw IllegalStateException("当前设备不支持系统打印")
     printManager.print(
         fileName,
         PdfFilePrintAdapter(context, pdfFile, fileName),
@@ -268,6 +272,11 @@ private class PdfFilePrintAdapter(
     private val pdfFile: File,
     private val documentName: String
 ) : PrintDocumentAdapter() {
+
+    override fun onFinish() {
+        pdfFile.delete()
+        super.onFinish()
+    }
 
     override fun onLayout(
         oldAttributes: PrintAttributes?,
@@ -542,18 +551,20 @@ private inline fun <T> withPageExportBitmap(
     page: ScannedPage,
     block: (Bitmap) -> T
 ): T {
-    val originalBitmap = requireNotNull(page.processedBitmap)
-    val exportBitmap = if (page.rotationDegrees % 360f == 0f) {
-        originalBitmap
-    } else {
-        SimpleDocumentScanner.rotate(originalBitmap, page.rotationDegrees)
+    val loadedBitmap = page.processedImagePath?.let {
+        requireNotNull(android.graphics.BitmapFactory.decodeFile(it)) { "无法读取文档页面" }
     }
+    val originalBitmap = loadedBitmap ?: requireNotNull(page.processedBitmap)
     return try {
-        block(exportBitmap)
-    } finally {
-        if (exportBitmap !== originalBitmap) {
-            exportBitmap.recycle()
+        val exportBitmap = if (page.rotationDegrees % 360f == 0f) {
+            originalBitmap
+        } else {
+            SimpleDocumentScanner.rotate(originalBitmap, page.rotationDegrees)
         }
+        try { block(exportBitmap) }
+        finally { if (exportBitmap !== originalBitmap) exportBitmap.recycle() }
+    } finally {
+        loadedBitmap?.recycle()
     }
 }
 

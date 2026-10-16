@@ -7,6 +7,10 @@ import android.os.ParcelFileDescriptor
 import android.os.SystemClock
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onAllNodesWithTag
+import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -52,17 +56,12 @@ class SmartManualCaptureE2eTest {
 
     @Test fun recognizedManualDocumentWaitsForShutterAndCollectsFivePages() {
         val startedAt = System.currentTimeMillis()
-        ParcelFileDescriptor.AutoCloseInputStream(
-            instrumentation.uiAutomation.executeShellCommand(
-                "pm grant ${instrumentation.targetContext.packageName} android.permission.CAMERA"
-            )
-        ).use { it.readBytes() }
-        // The activity may have cached its permission state before the shell grant.
         ui.activityRule.scenario.recreate()
         if (ui.onAllNodesWithText("我同意").fetchSemanticsNodes().isNotEmpty()) {
             ui.onNodeWithText("我同意").performClick()
         }
         ui.onNodeWithText("文件扫描").performTouchInput { click() }
+        enterCameraWhenReady(ui)
         ui.onNodeWithText("智能手拍").assertExists()
         ui.waitUntil(60_000) {
             ui.onAllNodesWithText("已识别文档，点击快门拍摄").fetchSemanticsNodes().isNotEmpty()
@@ -94,13 +93,19 @@ class SmartManualCaptureE2eTest {
             history.loadRecords().any { it.createdAtMillis >= startedAt && it.pageCount == 5 }
         }
         val saved = history.loadRecords().first { it.createdAtMillis >= startedAt && it.pageCount == 5 }
-        ParcelFileDescriptor.open(File(saved.filePath), ParcelFileDescriptor.MODE_READ_ONLY).use { fd ->
+        // PDF 按需生成：需要时才生成完整文档。
+        ParcelFileDescriptor.open(history.ensureDocumentPdf(saved.id), ParcelFileDescriptor.MODE_READ_ONLY).use { fd ->
             PdfRenderer(fd).use { assertEquals(5, it.pageCount) }
         }
         ui.activityRule.scenario.recreate()
-        ui.onAllNodesWithText(saved.title)[0].performScrollTo().performTouchInput { click() }
-        // A real PDF handler or the system resolver must open; a toast leaves us resumed.
-        ui.waitUntil(10_000) { ui.activityRule.scenario.state != Lifecycle.State.RESUMED }
+        ui.waitUntil(30_000) { ui.onAllNodesWithTag("history-${saved.id}").fetchSemanticsNodes().isNotEmpty() }
+        ui.onNode(hasText(saved.title) and hasAnyAncestor(hasTestTag("history-${saved.id}")))
+            .performScrollTo().performTouchInput { click() }
+        ui.waitUntil(60_000) {
+            ui.onAllNodesWithText("添加").fetchSemanticsNodes().isNotEmpty()
+        }
+        ui.onNodeWithText("预览").assertExists()
+        assertEquals(Lifecycle.State.RESUMED, ui.activityRule.scenario.state)
         screenshot("recent-document-opened")
     }
 }

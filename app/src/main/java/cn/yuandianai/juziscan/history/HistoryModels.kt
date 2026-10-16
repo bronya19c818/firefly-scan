@@ -11,7 +11,10 @@ data class HistoryRecord(
     val filePath: String,
     val mimeType: String,
     val thumbnailPath: String? = null,
-    val textPreview: String? = null
+    val textPreview: String? = null,
+    val updatedAtMillis: Long = createdAtMillis,
+    val documentManifestPath: String? = null,
+    val documentFingerprint: String? = null
 )
 
 enum class HistoryRecordKind {

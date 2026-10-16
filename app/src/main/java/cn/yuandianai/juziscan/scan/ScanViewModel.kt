@@ -33,6 +33,8 @@ class ScanViewModel {
 
     var pages by mutableStateOf<List<ScannedPage>>(emptyList())
     var activeIndex by mutableStateOf(0)
+    /** 逐页后台处理状态，键为页面 ID；与文档永久编辑参数分离。 */
+    var pagePhases by mutableStateOf<Map<String, PageProcessingPhase>>(emptyMap())
     var replacingIndex by mutableStateOf<Int?>(null)
     var pendingSingleResult by mutableStateOf<ScannedPage?>(null)
     var ocrUiState by mutableStateOf(OcrUiState())
@@ -46,6 +48,11 @@ class ScanViewModel {
     var selectedIdCardLayout by mutableStateOf(IdCardLayoutOption.VerticalPair)
     var activeLegalDoc by mutableStateOf<LegalDocType?>(null)
     var currentDocumentRecordId by mutableStateOf<String?>(null)
+    var documentVersion by mutableStateOf(0L)
+    var editingDocumentPage by mutableStateOf<ScannedPage?>(null)
+    var documentUiSession = 0L
+    var documentReturnStage by mutableStateOf(ScanStage.Home)
+    var openedFromHistory by mutableStateOf(false)
     var currentOcrRecordId by mutableStateOf<String?>(null)
     var currentIdCardRecordId by mutableStateOf<String?>(null)
     var vipPurchaseInFlight by mutableStateOf(false)
@@ -57,6 +64,10 @@ class ScanViewModel {
 
     val isVipMember: Boolean
         get() = membershipStatus?.is_vip == true
+
+    fun ensureDocumentId(): String = currentDocumentRecordId ?: java.util.UUID.randomUUID().toString().also {
+        currentDocumentRecordId = it
+    }
 
     // Called on the main thread before submitting a CameraX request.
     fun tryBeginCapture(): Boolean {
@@ -82,8 +93,11 @@ class ScanViewModel {
         shareSaveReturnStage = ScanStage.Preview
         shareSaveDefaultWatermarkText = "仅供本人使用"
         currentDocumentRecordId = null
+        openedFromHistory = false
+        documentReturnStage = ScanStage.Home
         currentOcrRecordId = null
         currentIdCardRecordId = null
+        pagePhases = emptyMap()
     }
 
     fun resetAutoCaptureHint() {
@@ -99,8 +113,14 @@ class ScanViewModel {
     }
 
     fun startEntry(entry: ScanEntry, openCapture: Boolean = true) {
+        documentUiSession++
+        isCapturing = false
+        isProcessingPreview = false
+        documentVersion = 0L
+        editingDocumentPage = null
         pages = emptyList()
         activeIndex = 0
+        pagePhases = emptyMap()
         replacingIndex = null
         pendingSingleResult = null
         ocrUiState = OcrUiState()
@@ -112,7 +132,9 @@ class ScanViewModel {
         showIdCardGuideOverlay = entry == ScanEntry.IdCard
         selectedIdCardDocumentType = IdCardDocumentType.IdentityCard
         selectedIdCardLayout = IdCardLayoutOption.VerticalPair
-        currentDocumentRecordId = null
+        currentDocumentRecordId = if (entry == ScanEntry.Document) java.util.UUID.randomUUID().toString() else null
+        openedFromHistory = false
+        documentReturnStage = ScanStage.Home
         currentOcrRecordId = null
         currentIdCardRecordId = null
         clearEditingState()
@@ -137,8 +159,14 @@ class ScanViewModel {
     }
 
     fun returnToHome() {
+        documentUiSession++
+        isCapturing = false
+        isProcessingPreview = false
+        documentVersion = 0L
+        editingDocumentPage = null
         pages = emptyList()
         activeIndex = 0
+        pagePhases = emptyMap()
         replacingIndex = null
         pendingSingleResult = null
         ocrUiState = OcrUiState()
@@ -151,6 +179,8 @@ class ScanViewModel {
         selectedIdCardDocumentType = IdCardDocumentType.IdentityCard
         selectedIdCardLayout = IdCardLayoutOption.VerticalPair
         currentDocumentRecordId = null
+        openedFromHistory = false
+        documentReturnStage = ScanStage.Home
         currentOcrRecordId = null
         currentIdCardRecordId = null
         clearEditingState()

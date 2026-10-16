@@ -25,6 +25,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.zIndex
 import cn.yuandianai.juziscan.common.CloseCrossIcon
 import cn.yuandianai.juziscan.scan.ScannedPage
 import cn.yuandianai.juziscan.ui.theme.HpSmartColors
@@ -35,8 +36,24 @@ fun ReorderScreen(
     onCancel: () -> Unit,
     onDone: (List<ScannedPage>) -> Unit
 ) {
-    var localPages by remember(pages) { mutableStateOf(pages) }
-    var draggedIndex by remember { mutableStateOf<Int?>(null) }
+    // 稳定页 ID 顺序草稿：后台逐页处理会更新 pages 的页面对象（位图/路径），
+    // 但排序只依赖页面 ID 的顺序，因此 pages 内容刷新时只做增删同步，不重置用户拖动出的顺序。
+    val order = remember { mutableStateListOf<String>() }
+    LaunchedEffect(pages) {
+        val incomingIds = pages.map { it.id }.toSet()
+        if (order.isEmpty()) {
+            order.addAll(pages.map { it.id })
+        } else {
+            order.removeAll { it !in incomingIds }
+            val known = order.toSet()
+            pages.forEach { if (it.id !in known) order.add(it.id) }
+        }
+    }
+    // 页面对象始终按 ID 取最新值，完成时再按顺序草稿合并提交。
+    val pageById = remember(pages) { pages.associateBy { it.id } }
+    val localPages = order.mapNotNull { pageById[it] }
+
+    var draggedPageId by remember { mutableStateOf<String?>(null) }
     var dragOffset by remember { mutableStateOf(Offset.Zero) }
 
     Column(
@@ -68,7 +85,8 @@ fun ReorderScreen(
             ActionPillButton(
                 text = "完成",
                 filled = true,
-                onClick = { onDone(localPages) },
+                // 按 ID 顺序草稿合并最新页面对象：保存回填或后台处理都不会让顺序回退。
+                onClick = { onDone(order.mapNotNull { pageById[it] }) },
                 modifier = Modifier.align(Alignment.CenterEnd)
             )
         }
@@ -118,7 +136,7 @@ fun ReorderScreen(
             ) {
                 localPages.forEachIndexed { index, page ->
                     key(page.id) {
-                        val isDragging = index == draggedIndex
+                        val isDragging = page.id == draggedPageId
                         val tX = targetX(index)
                         val tY = targetY(index)
 
@@ -131,7 +149,7 @@ fun ReorderScreen(
                         val animatedOffset by animateOffsetAsState(
                             targetValue = targetOffset,
                             animationSpec = if (isDragging) snap() else spring(stiffness = Spring.StiffnessMedium),
-                            label = "card_offset_$index"
+                            label = "card_offset_${page.id}"
                         )
 
                         val xDp = with(density) { (if (isDragging) (tX + dragOffset.x) else animatedOffset.x).toDp() }
@@ -140,32 +158,34 @@ fun ReorderScreen(
                         Box(
                             modifier = Modifier
                                 .offset(x = xDp, y = yDp)
+                                .zIndex(if (isDragging) 1f else 0f)
                                 .width(itemWidth)
                                 .height(totalCellHeight)
                                 .shadow(
                                     elevation = if (isDragging) 8.dp else 0.dp,
                                     shape = RoundedCornerShape(8.dp)
                                 )
-                                .pointerInput(index) {
+                                .pointerInput(page.id, widthPx, density.density) {
                                     detectDragGestures(
                                         onDragStart = { _ ->
-                                            draggedIndex = index
+                                            draggedPageId = page.id
                                             dragOffset = Offset.Zero
                                         },
                                         onDragEnd = {
-                                            draggedIndex = null
+                                            draggedPageId = null
                                             dragOffset = Offset.Zero
                                         },
                                         onDragCancel = {
-                                            draggedIndex = null
+                                            draggedPageId = null
                                             dragOffset = Offset.Zero
                                         },
                                         onDrag = { change, dragAmount ->
                                             change.consume()
                                             dragOffset += dragAmount
 
-                                            val currentIdx = draggedIndex
-                                            if (currentIdx != null) {
+                                            // 拖动只改页 ID 顺序草稿，页面对象随后按 ID 取最新值。
+                                            val currentIdx = order.indexOfFirst { it == draggedPageId }
+                                            if (currentIdx >= 0) {
                                                 val currX = targetX(currentIdx) + dragOffset.x + itemWidthPx / 2f
                                                 val currY = targetY(currentIdx) + dragOffset.y + itemHeightPx / 2f
 
@@ -175,18 +195,15 @@ fun ReorderScreen(
                                                 val row = ((currY - verticalSpacingPx / 2f) / (totalCellHeightPx + verticalSpacingPx))
                                                     .toInt()
                                                     .coerceAtLeast(0)
-                                                val hoverIndex = (row * numColumns + col).coerceIn(0, localPages.lastIndex)
+                                                val hoverIndex = (row * numColumns + col).coerceIn(0, order.lastIndex)
 
                                                 if (hoverIndex != currentIdx) {
-                                                    val newPages = localPages.toMutableList()
-                                                    val itemToMove = newPages.removeAt(currentIdx)
-                                                    newPages.add(hoverIndex, itemToMove)
+                                                    val movedId = order.removeAt(currentIdx)
+                                                    order.add(hoverIndex, movedId)
 
                                                     val dx = targetX(currentIdx) - targetX(hoverIndex)
                                                     val dy = targetY(currentIdx) - targetY(hoverIndex)
 
-                                                    localPages = newPages
-                                                    draggedIndex = hoverIndex
                                                     dragOffset = Offset(dragOffset.x + dx, dragOffset.y + dy)
                                                 }
                                             }
@@ -201,8 +218,10 @@ fun ReorderScreen(
                                     .background(Color.White, RoundedCornerShape(8.dp))
                                     .border(1.dp, Color(0xFFE5E6F2), RoundedCornerShape(8.dp))
                             ) {
+                                // 未处理页可能尚没有独立的常驻预览图：退回全尺寸原图渲染缩略图，
+                                // 排序只依赖页面 ID 元数据，不依赖处理缓存就绪，也不会再因缺图崩溃。
                                 RotatedPreviewImage(
-                                    bitmap = requireNotNull(page.previewBitmap),
+                                    bitmap = page.previewBitmap ?: page.sourceBitmap,
                                     rotationDegrees = page.rotationDegrees,
                                     contentDescription = "重新排序 ${index + 1}",
                                     modifier = Modifier
@@ -219,9 +238,7 @@ fun ReorderScreen(
                                     .background(Color(0xFFD32F2F), CircleShape)
                                     .pointerInput(page.id) {
                                         detectTapGesturesCompat {
-                                            val newPages = localPages.toMutableList()
-                                            newPages.removeAt(index)
-                                            localPages = newPages
+                                            order.remove(page.id)
                                         }
                                     },
                                 contentAlignment = Alignment.Center

@@ -389,7 +389,8 @@ object SimpleDocumentScanner {
     fun perspectiveCorrect(
         source: Bitmap,
         quad: List<PointF>,
-        correctionMode: CorrectionMode = CorrectionMode.AUTO
+        correctionMode: CorrectionMode = CorrectionMode.AUTO,
+        maxOutputSide: Int = MAX_PROCESSING_SIDE
     ): Bitmap {
         if (quad.size != 4) return source
         val src = FloatArray(8)
@@ -400,7 +401,7 @@ object SimpleDocumentScanner {
 
         val metrics = computePerspectiveMetrics(source, src)
         val resolvedAspect = resolveTargetAspect(metrics, correctionMode)
-        val (outWidth, outHeight) = resolveOutputSize(metrics, resolvedAspect)
+        val (outWidth, outHeight) = resolveOutputSize(metrics, resolvedAspect, maxOutputSide)
 
         return perspectiveCorrectInternal(source, src, outWidth, outHeight)
     }
@@ -518,14 +519,16 @@ object SimpleDocumentScanner {
         return metrics.normalizedAspect
     }
 
-    private fun resolveOutputSize(metrics: PerspectiveMetrics, targetAspect: Float): Pair<Int, Int> {
+    private fun resolveOutputSize(metrics: PerspectiveMetrics, targetAspect: Float,
+        maxSide: Int = MAX_PROCESSING_SIDE): Pair<Int, Int> {
+        require(maxSide > 0)
         val safeAspect = targetAspect.coerceAtLeast(0.1f)
         val baseArea = max(metrics.averageWidth * metrics.averageHeight, 1f)
         val rawWidth = max(sqrt(baseArea * safeAspect).roundToInt(), 1)
         val rawHeight = max(sqrt(baseArea / safeAspect).roundToInt(), 1)
         val longestSide = max(rawWidth, rawHeight)
-        if (longestSide <= MAX_PROCESSING_SIDE) return rawWidth to rawHeight
-        val scale = MAX_PROCESSING_SIDE / longestSide.toFloat()
+        if (longestSide <= maxSide) return rawWidth to rawHeight
+        val scale = maxSide / longestSide.toFloat()
         return max((rawWidth * scale).roundToInt(), 1) to
             max((rawHeight * scale).roundToInt(), 1)
     }

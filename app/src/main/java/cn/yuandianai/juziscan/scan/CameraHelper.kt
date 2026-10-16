@@ -139,8 +139,10 @@ fun bindCameraUseCases(
                 .setAspectRatioStrategy(AspectRatioStrategy.RATIO_4_3_FALLBACK_AUTO_STRATEGY)
                 .setResolutionStrategy(
                     ResolutionStrategy(
-                        Size(CAPTURE_TARGET_WIDTH, CAPTURE_TARGET_HEIGHT),
-                        ResolutionStrategy.FALLBACK_RULE_CLOSEST_LOWER_THEN_HIGHER
+                        if (captureTask == CaptureTask.Document) Size(4000, 3000)
+                        else Size(CAPTURE_TARGET_WIDTH, CAPTURE_TARGET_HEIGHT),
+                        if (captureTask == CaptureTask.Document) ResolutionStrategy.FALLBACK_RULE_CLOSEST_HIGHER_THEN_LOWER
+                        else ResolutionStrategy.FALLBACK_RULE_CLOSEST_LOWER_THEN_HIGHER
                     )
                 )
                 .build()
@@ -287,13 +289,13 @@ fun bindCameraUseCases(
 private const val CAPTURE_TARGET_WIDTH = 2048
 private const val CAPTURE_TARGET_HEIGHT = 1536
 
-fun imageProxyToBitmap(image: ImageProxy, maxSide: Int? = null): Bitmap? {
+fun imageProxyToBitmap(image: ImageProxy, maxSide: Int? = null, jpegQuality: Int = 75): Bitmap? {
     return when (image.format) {
         ImageFormat.YUV_420_888 -> {
             val nv21 = yuv420888ToNv21(image)
             val yuvImage = YuvImage(nv21, ImageFormat.NV21, image.width, image.height, null)
             val out = ByteArrayOutputStream()
-            yuvImage.compressToJpeg(AndroidRect(0, 0, image.width, image.height), 75, out)
+            yuvImage.compressToJpeg(AndroidRect(0, 0, image.width, image.height), jpegQuality, out)
             decodeCompressedBitmap(out.toByteArray(), maxSide)
         }
 

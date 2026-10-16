@@ -98,15 +98,31 @@ fun materializePageRotation(page: ScannedPage): ScannedPage {
             sourceBitmap = rotatedSource,
             reviewBitmap = rotatedReview,
             editableQuad = rotateQuadClockwise(rotatedPage.editableQuad),
+            detectedQuad = rotateQuadClockwise(rotatedPage.detectedQuad),
             processedBitmap = rotatedProcessed,
             previewBitmap = preparePreviewBitmap(rotatedProcessed),
-            rotationDegrees = 0f
+            rotationDegrees = 0f,
+            sourceImagePath = null,
+            processedImagePath = null,
+            contentRevision = java.util.UUID.randomUUID().toString()
         )
     }
     return rotatedPage
 }
 
+/** Only the page being edited is hydrated; the document keeps small previews. */
+fun hydratePageForEditing(page: ScannedPage): ScannedPage {
+    val source = page.sourceImagePath?.let {
+        requireNotNull(BitmapFactory.decodeFile(it)) { "无法读取原始页面" }
+    } ?: page.sourceBitmap
+    val processed = page.processedImagePath?.let {
+        requireNotNull(BitmapFactory.decodeFile(it)) { "无法读取处理后的页面" }
+    } ?: page.processedBitmap
+    return page.copy(sourceBitmap = source, reviewBitmap = prepareWorkingBitmap(source), processedBitmap = processed)
+}
+
 const val SCAN_INPUT_MAX_SIDE = 2200
+const val DOCUMENT_INPUT_MAX_SIDE = 4096
 private const val DEFAULT_BITMAP_MAX_SIDE = 4096
 
 internal fun calculateBoundedDimensions(
@@ -173,8 +189,47 @@ fun loadBitmapFromUri(
     }
 }
 
-fun prepareAvatarJpeg(context: Context, uri: Uri, maxSide: Int = 512): ByteArray? {
-    val source = loadBitmapFromUri(context, uri, maxSide) ?: return null
+/** 按上界从磁盘解码位图；原图只需可靠持久化，重开文档不重复全尺寸驻留内存。 */
+fun decodeBitmapFromFileBounded(path: String, maxSide: Int): Bitmap? {
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+        return ImageDecoder.decodeBitmap(ImageDecoder.createSource(java.io.File(path))) { decoder, info, _ ->
+            val (width, height) = calculateBoundedDimensions(info.size.width, info.size.height, maxSide)
+            decoder.setTargetSize(width, height)
+            decoder.allocator = ImageDecoder.ALLOCATOR_SOFTWARE
+        }
+    }
+    val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+    BitmapFactory.decodeFile(path, bounds)
+    if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
+    var sampleSize = 1
+    while (max(bounds.outWidth / sampleSize, bounds.outHeight / sampleSize) > maxSide * 2) {
+        sampleSize *= 2
+    }
+    val options = BitmapFactory.Options().apply {
+        inSampleSize = sampleSize
+        inPreferredConfig = Bitmap.Config.ARGB_8888
+    }
+    val raw = BitmapFactory.decodeFile(path, options) ?: return null
+    val exif = android.media.ExifInterface(path)
+    val rotation = when (exif.getAttributeInt(android.media.ExifInterface.TAG_ORIENTATION, 1)) {
+        android.media.ExifInterface.ORIENTATION_ROTATE_90 -> 90f
+        android.media.ExifInterface.ORIENTATION_ROTATE_180 -> 180f
+        android.media.ExifInterface.ORIENTATION_ROTATE_270 -> 270f
+        else -> 0f
+    }
+    val decoded = SimpleDocumentScanner.rotate(raw, rotation)
+    if (decoded !== raw) raw.recycle()
+    val (targetWidth, targetHeight) = calculateBoundedDimensions(decoded.width, decoded.height, maxSide)
+    return if (targetWidth == decoded.width && targetHeight == decoded.height) {
+        decoded
+    } else {
+        Bitmap.createScaledBitmap(decoded, targetWidth, targetHeight, true).also {
+            if (it !== decoded) decoded.recycle()
+        }
+    }
+}
+
+fun prepareAvatarJpeg(context: Context, uri: Uri, maxSide: Int = 512): ByteArray? {    val source = loadBitmapFromUri(context, uri, maxSide) ?: return null
     val longestSide = max(source.width, source.height)
     val avatar = if (longestSide <= maxSide) {
         source
@@ -199,12 +254,12 @@ data class SourceBitmapProcessingResult(
     val quad: List<PointF>
 )
 
-fun processSourceBitmap(context: Context, bitmap: Bitmap): SourceBitmapProcessingResult {
+fun processSourceBitmap(context: Context, bitmap: Bitmap, preserveOriginal: Boolean = false): SourceBitmapProcessingResult {
     val workingBitmap = prepareWorkingBitmap(bitmap)
     val quad = SimpleDocumentScanner.detectDocumentQuad(context, workingBitmap) ?: emptyList()
-    if (workingBitmap !== bitmap && !bitmap.isRecycled) bitmap.recycle()
+    if (!preserveOriginal && workingBitmap !== bitmap && !bitmap.isRecycled) bitmap.recycle()
     return SourceBitmapProcessingResult(
-        sourceBitmap = workingBitmap,
+        sourceBitmap = if (preserveOriginal) bitmap else workingBitmap,
         reviewBitmap = workingBitmap,
         quad = quad
     )

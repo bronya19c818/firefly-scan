@@ -4,6 +4,7 @@ import android.graphics.Bitmap
 import android.graphics.PointF
 import androidx.camera.core.ImageCapture
 import cn.yuandianai.juziscan.scanner.SimpleDocumentScanner
+import java.io.File
 
 enum class ScanStage {
     Home,
@@ -103,8 +104,35 @@ data class ScannedPage(
     val correctionMode: SimpleDocumentScanner.CorrectionMode = SimpleDocumentScanner.CorrectionMode.AUTO,
     val processedBitmap: Bitmap? = null,
     val previewBitmap: Bitmap? = null,
-    val rotationDegrees: Float = 0f
-)
+    val rotationDegrees: Float = 0f,
+    // File-backed pages retain only a small display bitmap until editing/export.
+    val sourceImagePath: String? = null,
+    val processedImagePath: String? = null,
+    val detectedQuad: List<PointF> = emptyList(),
+    val contentRevision: String = java.util.UUID.randomUUID().toString(),
+    val imageStyle: String = "default"
+) {
+    val isProcessed: Boolean get() = processedBitmap != null || processedImagePath != null
+
+    /**
+     * 处理结果是否真的可取用：内存位图存在，或处理图文件仍在磁盘上。
+     * 处理图属于可重建缓存，被清理后页面必须退回「待处理」，由后台队列重新补齐，
+     * 而不是永远停在一个指向空文件的「已处理」状态。
+     */
+    val hasProcessedOutput: Boolean
+        get() = processedBitmap != null || processedImagePath?.let { File(it).isFile } == true
+}
+
+/** Paths and Bitmap identities are deliberately excluded: reloading is not an edit. */
+fun documentFingerprint(pages: List<ScannedPage>): String {
+    val value = pages.joinToString(";") { page ->
+        listOf(page.id, page.contentRevision, normalizePageRotation(page.rotationDegrees),
+            page.correctionMode.name, page.imageStyle,
+            page.editableQuad.joinToString(",") { "${it.x}:${it.y}" }).joinToString("|")
+    }
+    return java.security.MessageDigest.getInstance("SHA-256")
+        .digest(value.toByteArray(Charsets.UTF_8)).joinToString("") { "%02x".format(it) }
+}
 
 data class OcrUiState(
     val isRecognizing: Boolean = false,
