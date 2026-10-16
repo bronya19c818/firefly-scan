@@ -2586,7 +2586,7 @@ private fun ExitConfirmationDialog(
                 )
 
                 ActionPillButton(
-                    text = "重新扫描",
+                    text = "新的扫描",
                     filled = false,
                     onClick = onRescan,
                     modifier = Modifier.fillMaxWidth().height(48.dp)
@@ -2600,7 +2600,7 @@ private fun ExitConfirmationDialog(
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        text = "放弃并返回首页",
+                        text = "暂存并返回首页",
                         color = Color(0xFFFF4D4F),
                         fontSize = 14.sp,
                         fontWeight = FontWeight.Medium
