@@ -467,7 +467,9 @@ private fun ScannerFlowScreen(
                         val index = vm.pages.indexOfFirst { it.id == intermediate.id }
                         if (index < 0) return@launch
                         val current = vm.pages[index]
-                        if (current.contentRevision != intermediate.contentRevision || current.isProcessed) {
+                        if (current.contentRevision != intermediate.contentRevision ||
+                            current.hasProcessedOutput
+                        ) {
                             return@launch
                         }
                         vm.pages = vm.pages.toMutableList().also {
@@ -481,7 +483,7 @@ private fun ScannerFlowScreen(
                 if (index >= 0) {
                     val current = vm.pages[index]
                     // 只采用与当前页面状态匹配的结果：内容版本变化或已就绪的页面直接丢弃旧结果。
-                    if (shouldApplyProcessedPage(current.contentRevision, current.isProcessed,
+                    if (shouldApplyProcessedPage(current.contentRevision, current.hasProcessedOutput,
                             processed.contentRevision)
                     ) {
                         vm.pages = vm.pages.toMutableList().also { it[index] = processed }
@@ -509,7 +511,7 @@ private fun ScannerFlowScreen(
 
         /** 提交所有尚未处理的页面，由后台队列按优先级逐页处理。 */
         fun submitPendingPages() {
-            pages.filter { !it.isProcessed }.forEach { processingQueue.submit(it.id) }
+            pages.filter { !it.hasProcessedOutput }.forEach { processingQueue.submit(it.id) }
         }
 
         /** 用户切换页面时提升该页的处理优先级。 */
@@ -1247,7 +1249,7 @@ private fun ScannerFlowScreen(
         /** 等待全部页面处理完成（当前页优先）后再执行导出动作，避免导出缺页或错误内容。 */
         fun runWhenPagesReady(action: () -> Unit) {
             if (documentActionBlocked()) return
-            val pending = pages.filter { !it.isProcessed }
+            val pending = pages.filter { !it.hasProcessedOutput }
             if (pending.isEmpty()) {
                 action()
                 return
@@ -1262,12 +1264,12 @@ private fun ScannerFlowScreen(
                     val settled = withTimeoutOrNull(180_000L) {
                         snapshotFlow {
                             pages.isNotEmpty() && pages.all { page ->
-                                page.isProcessed || pagePhases[page.id] == PageProcessingPhase.FAILED
+                                page.hasProcessedOutput || pagePhases[page.id] == PageProcessingPhase.FAILED
                             }
                         }.first { it }
                     } == true
                     when {
-                        pages.all { it.isProcessed } -> action()
+                        pages.all { it.hasProcessedOutput } -> action()
                         settled -> Toast.makeText(
                             context,
                             "部分页面处理失败，请重试后再导出",
@@ -1341,6 +1343,9 @@ private fun ScannerFlowScreen(
                         )
                     }
                     withContext(Dispatchers.IO) { clearTemporaryProcessedPages(context, snapshot) }
+                    // 保存时缓存缺失或被清理的页面继续后台补齐，文档不会停在缺图状态。
+                    submitPendingPages()
+                    promoteActivePage()
                     refreshHistoryRecords()
                 } catch (error: Exception) {
                     if (error is CancellationException) throw error

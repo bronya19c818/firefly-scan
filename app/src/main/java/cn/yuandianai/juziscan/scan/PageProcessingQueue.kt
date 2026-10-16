@@ -45,7 +45,7 @@ class PageProcessingQueue(
     /** 提交一个待处理页面；已处理完成的直接标记 READY。 */
     fun submit(pageId: String) {
         val page = pageProvider(pageId) ?: return
-        if (page.isProcessed) {
+        if (page.hasProcessedOutput) {
             onPhaseChanged(pageId, PageProcessingPhase.READY)
             return
         }
@@ -81,7 +81,7 @@ class PageProcessingQueue(
                     withContext(Dispatchers.Default) {
                         // 执行时读取最新页面：期间被替换 / 删除的任务直接跳过。
                         val page = pageProvider(pageId) ?: return@withContext null
-                        if (page.isProcessed) page else processPage(page)
+                        if (page.hasProcessedOutput) page else processPage(page)
                     }
                 }
                 when {

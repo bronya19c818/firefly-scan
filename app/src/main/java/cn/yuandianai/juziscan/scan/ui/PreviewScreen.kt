@@ -141,11 +141,16 @@ fun PreviewResultScreen(
                 val isCurrent = pageIdx == activeIndex
                 // 两级显示：当前页加载高清处理图；未处理页面先用快速预览占位，
                 // 其余页面只保留小图，避免同时持有大量 Bitmap。
+                // 只有真正换页时才清空画面：同一页由后台处理补齐时保留当前图像，
+                // 直到新图解码完成再替换，避免瞬间空白。
+                var shownPageId by remember { mutableStateOf<String?>(null) }
                 val displayBitmap by produceState<Bitmap?>(
                     null, page.id, page.contentRevision, page.processedImagePath,
                     page.processedBitmap, page.previewBitmap, isCurrent
                 ) {
-                    value = null
+                    val switchingPage = shownPageId != null && shownPageId != page.id
+                    shownPageId = page.id
+                    if (switchingPage) value = null
                     value = withContext(Dispatchers.IO) {
                         try {
                             if (isCurrent) {

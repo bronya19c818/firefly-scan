@@ -5,6 +5,7 @@ import android.graphics.Bitmap
 import cn.yuandianai.juziscan.scanner.SimpleDocumentScanner
 import java.io.File
 import java.io.FileOutputStream
+import java.util.UUID
 
 /**
  * 单页文档处理：透视矫正 → 图像增强 → 处理图编码落盘 → 预览图。
@@ -76,21 +77,35 @@ fun processDocumentPage(
             // 目标目录可能尚未创建（文档缓存按页面分目录），先保证父目录存在。
             check(output.parentFile?.let { it.isDirectory || it.mkdirs() } == true) { "无法创建页面缓存目录" }
             // tmp + 原子替换：写入文档缓存时崩溃不会留下半截文件。
-            val tmp = File(output.parentFile, output.name + ".tmp")
-            writeBitmapSynced(tmp, processed, Bitmap.CompressFormat.PNG, 100)
-            if (output.exists() && !output.delete()) {
+            // tmp 名必须唯一：后台队列与 PDF 缺页补处理可能同时在写同一页缓存，
+            // 固定 tmp 名会让两个写入者互相踩掉对方的暂存文件，最终 renameTo 失败。
+            val tmp = File(output.parentFile, "${output.name}.${UUID.randomUUID()}.tmp")
+            try {
+                writeBitmapSynced(tmp, processed, Bitmap.CompressFormat.PNG, 100)
+            } catch (error: Throwable) {
                 tmp.delete()
-                throw IllegalStateException("处理缓存替换失败")
+                throw error
             }
-            check(tmp.renameTo(output)) { "页面暂存失败" }
+            // 并发写入者已经写好同一份缓存时直接复用，不再重复覆盖。
+            if (output.isFile && output.length() > 0) {
+                tmp.delete()
+            } else {
+                if (output.exists() && !output.delete()) {
+                    tmp.delete()
+                    throw IllegalStateException("处理缓存替换失败")
+                }
+                check(tmp.renameTo(output)) { "页面暂存失败" }
+                tmp.delete()
+            }
             if (processedOutput != null) {
                 // 直接写入文档缓存时顺带落一份预览缓存，加速下次打开。
                 runCatching {
-                    val previewTmp = File(output.parentFile, output.nameWithoutExtension + ".preview.tmp")
+                    val previewTmp = File(output.parentFile,
+                        "${output.nameWithoutExtension}.${UUID.randomUUID()}.preview.tmp")
                     writeBitmapSynced(previewTmp, previewImage, Bitmap.CompressFormat.JPEG, 88)
                     val previewCache = File(output.parentFile, output.nameWithoutExtension + ".jpg")
                     if (previewCache.exists()) previewCache.delete()
-                    previewTmp.renameTo(previewCache)
+                    if (!previewTmp.renameTo(previewCache)) previewTmp.delete()
                 }.onFailure {
                     android.util.Log.w("JuZiScan", "Could not write page preview cache", it)
                 }

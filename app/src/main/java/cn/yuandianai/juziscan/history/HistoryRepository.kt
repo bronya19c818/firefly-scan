@@ -120,7 +120,10 @@ class HistoryRepository(private val context: Context) {
     fun pageAssetPaths(recordId: String, page: ScannedPage): Pair<String, String?> {
         val documentDir = File(documentsDir, recordId)
         val sourcePath = documentStore.pageSourcePathFor(documentDir, page)
-        val processedPath = if (page.isProcessed) documentStore.processedCacheFileFor(documentDir, page).path else null
+        // 只绑定真正可取用的处理图：缓存被清理过的页面退回待处理，由后台队列补齐。
+        val processedPath = if (page.hasProcessedOutput) {
+            documentStore.processedCacheFileFor(documentDir, page).path
+        } else null
         return sourcePath to processedPath
     }
 

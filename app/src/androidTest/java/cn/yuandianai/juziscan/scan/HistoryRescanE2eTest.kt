@@ -185,6 +185,7 @@ class HistoryRescanE2eTest {
         try {
             ready()
             open(record.id)
+            val originalIds = repository.loadDocumentPages(record.id).map { it.id }.toSet()
             ui.onNodeWithText("添加").performTouchInput { click() }
             enterCameraWhenReady(ui)
             for (count in 4..5) {
@@ -197,17 +198,35 @@ class HistoryRescanE2eTest {
             ui.onNodeWithContentDescription("已拍页面预览").performClick()
             ui.waitUntil(90_000) { ui.onAllNodesWithText("文档未保存").fetchSemanticsNodes().isNotEmpty() }
             assertEquals(3, repository.loadRecords().first { it.id == record.id }.pageCount)
-            val cache = File(instrumentation.targetContext.cacheDir, "document-page-processing")
-            val temporary = cache.listFiles().orEmpty().filter { it.isFile && it.lastModified() >= started }
-            assertTrue("Captured pages must be staged on disk", temporary.isNotEmpty())
-            temporary.forEach { check(it.delete()) }
+            // 已保存文档的页面处理缓存直接落在文档缓存目录（不再经由应用临时目录）。
+            val cachePages = File(File(requireNotNull(record.documentManifestPath)).parentFile, "cache/pages")
+            fun stagedCaches(): List<File> = cachePages.listFiles().orEmpty()
+                .filter { it.isDirectory && it.name !in originalIds }
+                .flatMap { it.listFiles().orEmpty().toList() }
+            ui.waitUntil(90_000) { stagedCaches().isNotEmpty() }
+            val staged = stagedCaches()
+            assertTrue("新增页面必须先落盘处理缓存", staged.isNotEmpty())
+            staged.forEach { check(it.delete()) { "无法删除处理缓存：${it.name}" } }
             check(blocked.deleteRecursively())
             ownsBlocker = false
             ui.onNodeWithText("重试").performClick()
             ui.waitUntil(90_000) { repository.loadRecords().any { it.id == record.id && it.pageCount == 5 } }
+            // 处理缓存丢失后由后台逐页补齐，直到每页都有处理图。
+            ui.waitUntil(90_000) {
+                cachePages.listFiles().orEmpty().filter { it.isDirectory }
+                    .all { it.listFiles().orEmpty().any { file -> file.extension == "png" } }
+            }
             ui.waitUntil(30_000) { ui.onAllNodesWithText("正在", substring = true).fetchSemanticsNodes().isEmpty() }
             assertEquals(1, repository.loadRecords().count { it.id == record.id })
-            assertTrue(cache.listFiles().orEmpty().none { it.lastModified() >= started })
+            val restored = repository.loadDocumentPages(record.id)
+            assertEquals(5, restored.size)
+            restored.forEach { page ->
+                assertTrue("原图不得丢失", File(requireNotNull(page.sourceImagePath)).isFile)
+                assertNotNull("处理缓存必须重建", page.processedImagePath)
+                assertTrue(File(requireNotNull(page.processedImagePath)).isFile)
+            }
+            assertTrue(File(instrumentation.targetContext.cacheDir, "document-page-processing")
+                .listFiles().orEmpty().none { it.lastModified() >= started })
             evidence("missing-cache-rebuilt-same-document")
         } finally {
             if (ownsBlocker) blocked.deleteRecursively()

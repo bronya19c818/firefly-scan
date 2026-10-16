@@ -95,6 +95,7 @@ filesDir/history/
 
 - 原图只在内容版本变化时写一次；重开文档不重新编码原图。
 - 处理图 / 预览图 / PDF 全部为可重建缓存，按 cacheKey 失效重建；清理只针对未引用资产，不动原图。
+- 缓存可重建的前提是「缺失能被发现」：`ScannedPage.hasProcessedOutput` 以磁盘实际存在为准，缓存被清理或写入失败的页面会退回待处理状态，由后台队列重新补齐（保存成功后也会再提交一次待处理页），不会停在指向空文件的「已处理」状态。
 - 常驻预览图统一受 `PREVIEW_MAX_SIDE = 640` 约束：持久化预览缓存与「缓存缺失时降级解码原图」同口径，历史列表与预览页的内存峰值可控。
 - 预览页只给当前可见页加载较高清晰度（2048）图像，其余页用小图；Bitmap 由 `produceState` 按页 key 生成并随组合退出释放。
 - 后台并发固定为 2，连续拍摄时不被全速高清处理拖慢；拍摄后新页立即入列，处理与下一次快门重叠。
@@ -115,26 +116,32 @@ JVM 单测分布：`DocumentManifestTest` 11、`PageProcessingQueueTest` 10、`B
 
 **真机测试**（OnePlus PKR110 / Android 16）
 
-已执行的非相机用例 **8 项全部通过**：
+`tools/run-history-rescan-e2e.ps1` 完整脚本 **18 项全部通过**：基础回归 15 项 76.5 秒，三个独立进程冷启动阶段 15.7 / 15.2 / 4.7 秒；设备日志零 error。
 
-| 测试类 | 用例 | 结果 |
+| 分组 | 用例数 | 覆盖 |
 | --- | --- | --- |
-| `HistoryDocumentPersistenceTest` | `createReopenAppendEditAndDeleteSameDocument` | ✔ 保存不生成 PDF、追加不重写未变化原图、旋转/排序不重建图片、PDF 按需生成 4 页、无修改复用 PDF 缓存且字节一致 |
-| 同上 | `failedUpdateKeepsCommittedFilesAndIndex` | ✔ 资产写入失败与索引写入失败两种情况，已提交清单与索引均不变（新增清单回滚断言） |
-| 同上 | `unprocessedPagePersistsSourceAndResumesProcessing` | ✔ 未处理页只落原图，需要 PDF 时再补处理 |
-| `HistoryQualityAndReorderE2eTest` | `sixPageDragReachesLastCellAndSettlesAfterRelease` | ✔ |
-| 同上 | `reopenedPageShowsFineDetailAndRetainsFullSizeExport` | ✔ 重开预览 `height ≤ 640`，导出仍为 3000×4000 原尺寸 |
-| `HistoryRescanE2eTest` | `recentAndAllDocumentsRestorePreviewAndRotationWithoutNoOpWrites` | ✔ |
-| 同上 | `reorderCropCancelAndDeleteAllPersistThroughExistingControls` | ✔ |
-| 同上 | `failedAutoSaveKeepsOriginalAndRetryUpdatesSameRecord` | ✔ 失败后清单未推进，重试写入同一条记录 |
+| `HistoryDocumentPersistenceTest` | 3 | 保存不生成 PDF、追加不重写未变化原图、旋转/排序不重建图片、PDF 按需生成与无修改复用（字节一致）、资产与索引两种失败均保留已提交状态 |
+| `HistoryRescanE2eTest` | 5 | 真实相机追加两页到同 ID 五页、最近/全部文档恢复、排序裁剪删除持久化、失败保存不推进清单与索引、处理缓存丢失后重试重建且原图不丢 |
+| `SmartManualCaptureTest` | 4 | 自动拍稳定阈值与冷却、稳定文档不请求拍摄、手拍不依赖检测且拒绝连击、丢失文档清除反馈 |
+| `SmartManualCaptureE2eTest` | 1 | 识别到文档后等待快门并连续收集五页 |
+| `HistoryQualityAndReorderE2eTest` | 2 | 六页拖拽归位、重开预览细线可辨与全尺寸导出 |
+| `HistoryProcessRestartE2eTest`（三个冷启动阶段） | 3 | 真实三页拍摄、重启追加自动拍与手拍至同 ID 五页、重启恢复后验证无修改与分享/打印 |
 
-**本轮修复的三个真机问题**
+关键工件指标：
+
+- `quality-metrics.json`：导出 3000×4000 原尺寸、屏幕对比度 255、黑白过渡 375 次、常驻预览高度 640 —— 清晰度未因降采样退化。
+- `process-document.json`：五页 PDF、原三页 ID 与原图 SHA-256 不变、无修改文件字节未变、系统分享与打印界面均成功打开。
+- `persistence.txt`：3 → 5 → 4 页的增量写盘与按需 PDF。
+
+**本轮修复的问题**
 
 1. 后台队列写页面缓存时目标目录未创建 → `PageProcessor` 写 tmp 前先 `mkdirs()`。
 2. 持久化预览图沿用内存里的 1280 上限 → 落盘预览缓存与降级解码统一降到 `PREVIEW_MAX_SIDE = 640`。
-3. **索引写入失败时清单已先提交**（页面旋转 `0.0 → 90.0`，长度 +1、封面签名随之改变）→ `HistoryRepository` 在索引提交失败时用保存前读取的清单字节回滚，两个提交点恢复一致；`HistoryDocumentPersistenceTest` 相应补上清单回滚断言。
-
-**仍需真实相机的用例**（9 项，需把镜头对准文档后跑 `tools/run-history-rescan-e2e.ps1` 的 17 项完整脚本）：`HistoryRescanE2eTest#addTwoCameraPagesToExistingThreeAndReopenSameFivePageDocument`、`HistoryRescanE2eTest#missingTemporaryPagesAreReprocessedOnRetryWithoutLosingOriginal`、`HistoryProcessRestartE2eTest` 3 项、`SmartManualCaptureE2eTest#recognizedManualDocumentWaitsForShutterAndCollectsFivePages`，以及三个冷启动阶段。
+3. **索引写入失败时清单已先提交**（页面旋转 `0.0 → 90.0`，长度 +1、封面签名随之改变）→ `HistoryRepository` 在索引提交失败时用保存前读取的清单字节回滚（`DocumentStore.restoreManifest`），两个提交点恢复一致；测试补上清单回滚断言。
+4. **预览节点在页面处理完成时瞬间消失**：`produceState` 无条件 `value = null`，同一页由后台补齐高清图时会先闪空。改为只在真正换页（页面 ID 变化）时清屏，同页更新保留当前画面直到新图就绪。
+5. **并发写同一页缓存互相踩踏**：后台队列与 `ensureDocumentPdf` 的缺页补处理共用固定 tmp 文件名，一方 `renameTo` 后另一方的 `renameTo` 失败并抛「页面暂存失败」。改为 tmp 名带随机后缀；目标已由并发写入者写好的情况下直接复用，不重复覆盖。
+6. **可重建缓存被清理后永不重建**：`isProcessed` 只判断路径是否非空，缓存文件消失后页面仍被当作已处理，后台不再补处理。新增 `ScannedPage.hasProcessedOutput`（以磁盘实际存在为准），队列提交、结果版本绑定、导出就绪判据与保存后重绑定统一改用；保存成功后补调 `submitPendingPages()`，缺缓存的页自动补齐。相应地 `missingTemporaryPagesAreReprocessedOnRetryWithoutLosingOriginal` 改为验证「新增页处理缓存落在文档缓存目录 → 删除 → 重试后自动重建、原图不丢」。
+7. 设备测试脚本的成功判据硬编码 `OK (14 tests)`，用例增减后误报失败 → 改为「无 FAILURES 且匹配 `OK (N tests)`」的数量无关判据，收尾文案按实际数量输出。
 
 ## 十、回归清单
 
