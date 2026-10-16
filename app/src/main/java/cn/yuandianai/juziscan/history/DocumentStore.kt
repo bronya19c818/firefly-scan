@@ -3,93 +3,386 @@ package cn.yuandianai.juziscan.history
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.PointF
+import android.util.Log
 import cn.yuandianai.juziscan.scan.*
 import cn.yuandianai.juziscan.scanner.SimpleDocumentScanner
 import java.io.File
 import java.io.FileOutputStream
-import org.json.JSONArray
-import org.json.JSONObject
+import java.io.IOException
 
-/** Immutable version directories; records.json is the sole commit point. */
+/**
+ * 独立页面资产管理：
+ * - 原图是不可变资产（一个内容版本一个文件），处理图 / 预览图 / PDF 全部是可重建缓存；
+ * - 保存只写入新增或真正变化的页面资产，清单（document.json）原子替换作为唯一提交点；
+ * - 不再复制整份文档实现回退，失败时旧清单仍指向旧资产，文档保持最后一次有效状态。
+ */
 internal class DocumentStore(private val root: File) {
-    fun writeVersion(directory: File, pages: List<ScannedPage>) {
-        check(directory.mkdirs()) { "无法创建文档目录" }
-        val metadata = JSONArray()
-        pages.forEach { page ->
-            val pageDir = File(directory, page.id)
+
+    fun save(documentDir: File, pages: List<ScannedPage>): DocumentManifest {
+        check(documentDir.canonicalPath.startsWith(root.canonicalPath + File.separator) ||
+            documentDir.canonicalPath == root.canonicalPath) { "文档目录越界" }
+        require(pages.isNotEmpty()) { "文档没有页面" }
+        require(pages.distinctBy { it.id }.size == pages.size) { "页面 ID 重复" }
+        val pagesDir = File(documentDir, PAGES_DIR)
+        check(pagesDir.exists() || pagesDir.mkdirs()) { "无法创建文档目录" }
+
+        val oldManifest = readManifestOrNull(documentDir)
+        val oldEntries = oldManifest?.pages?.associateBy { it.id } ?: emptyMap()
+        val obsoleteFiles = mutableListOf<File>()
+
+        val entries = pages.map { page ->
             require(page.id.matches(Regex("[a-zA-Z0-9-]+"))) { "无效页面 ID" }
-            check(pageDir.mkdir()) { "页面 ID 重复" }
-            saveImage(File(pageDir, "source.png"), page.sourceImagePath, page.sourceBitmap)
-            saveImage(File(pageDir, "processed.png"), page.processedImagePath, page.processedBitmap)
-            val preview = requireNotNull(page.previewBitmap) { "页面尚未处理完成" }
-            val small = preparePreviewBitmap(preview, 640)
-            try { saveBitmap(File(pageDir, "preview.jpg"), small, Bitmap.CompressFormat.JPEG) }
-            finally { if (small !== preview) small.recycle() }
-            metadata.put(JSONObject().put("id", page.id).put("contentRevision", page.contentRevision)
-                .put("rotationDegrees", page.rotationDegrees).put("correctionMode", page.correctionMode.name)
-                .put("imageStyle", page.imageStyle).put("quad", JSONArray().apply {
-                    page.editableQuad.forEach { put(JSONArray().put(it.x).put(it.y)) }
-                }))
+            val entry = buildEntry(page)
+            val sourceFile = pageSourceFile(documentDir, entry)
+            val processedFile = processedCacheFile(documentDir, entry)
+            val processedOutputAvailable = page.processedImagePath?.let {
+                File(it).isFile && File(it).length() > 0
+            } == true || page.processedBitmap != null
+
+            val plan = planPageSave(
+                old = oldEntries[page.id],
+                new = PageSaveSnapshot(
+                    id = entry.id,
+                    contentRevision = entry.contentRevision,
+                    cacheKey = entry.cacheKey,
+                    rotationDegrees = entry.rotationDegrees,
+                    correctionMode = entry.correctionMode,
+                    imageStyle = entry.imageStyle,
+                    sourceFileExists = sourceFile.isFile && sourceFile.length() > 0,
+                    hasProcessedOutput = processedOutputAvailable,
+                    processedCacheExists = processedFile.isFile && processedFile.length() > 0
+                )
+            )
+
+            if (plan.rewriteSource) {
+                check(File(pagesDir, page.id).isDirectory || File(pagesDir, page.id).mkdirs()) { "无法创建页面目录" }
+                writeSourceAtomically(sourceFile, page)
+            }
+            if (plan.writeProcessedCache) {
+                writeProcessedCacheAtomically(processedFile, page)
+            }
+            plan.obsoleteSourceFile?.let { revision ->
+                obsoleteFiles += File(File(pagesDir, page.id), "$revision${SOURCE_EXT}")
+            }
+            plan.obsoleteCacheKey?.let { key ->
+                obsoleteFiles += File(processedCacheDir(documentDir, page.id), "$key${PROCESSED_EXT}")
+                obsoleteFiles += File(processedCacheDir(documentDir, page.id), "$key${PREVIEW_EXT}")
+            }
+            entry
         }
-        val manifest = JSONObject().put("schemaVersion", 1).put("pages", metadata)
-        writeSynced(File(directory, "document.json")) { it.write(manifest.toString().toByteArray(Charsets.UTF_8)) }
-        writeSynced(File(directory, "document.pdf")) { writePdfToStream(it, pages, ExportFileSize.Actual) }
-        val first = pages.first()
-        val preview = requireNotNull(first.previewBitmap)
-        val rotated = if (first.rotationDegrees == 0f) preview else SimpleDocumentScanner.rotate(preview, first.rotationDegrees)
-        val thumb = preparePreviewBitmap(rotated, 360)
-        try { saveBitmap(File(directory, "thumbnail.jpg"), thumb, Bitmap.CompressFormat.JPEG) }
-        finally {
-            if (thumb !== rotated) thumb.recycle()
-            if (rotated !== preview) rotated.recycle()
-        }
+
+        // 唯一提交点：所有页面资产写入成功后，原子替换清单。
+        val manifest = DocumentManifest(pages = entries, coverSignature = computeCoverSignature(entries.first()))
+        writeManifestAtomically(documentDir, manifest)
+        ensureThumbnail(documentDir, manifest, oldManifest?.coverSignature)
+        invalidatePdfCache(documentDir)
+
+        // 清理必须发生在提交之后，不能把一次成功保存变成失败。
+        runCatching { cleanupObsoleteAssets(documentDir, manifest, obsoleteFiles) }
+            .onFailure { Log.w("JuZiScan", "Could not clean obsolete page assets", it) }
+        return manifest
     }
 
     fun loadPages(manifestPath: String): List<ScannedPage> {
         val manifestFile = File(manifestPath)
-        require(manifestFile.canonicalPath.startsWith(root.canonicalPath + File.separator))
-        val manifest = JSONObject(manifestFile.readText(Charsets.UTF_8))
-        require(manifest.getInt("schemaVersion") == 1) { "不支持的文档格式" }
-        val entries = manifest.getJSONArray("pages")
-        require(entries.length() > 0) { "文档没有页面" }
-        val ids = HashSet<String>()
-        return buildList {
-            for (i in 0 until entries.length()) {
-                val item = entries.getJSONObject(i)
-                val id = item.getString("id")
-                require(id.matches(Regex("[a-zA-Z0-9-]+")) && ids.add(id)) { "无效页面 ID" }
-                val dir = File(manifestFile.parentFile, id)
-                val source = File(dir, "source.png")
-                val processed = File(dir, "processed.png")
-                require(source.isFile && source.length() > 0 && processed.isFile && processed.length() > 0) { "文档页面文件缺失" }
-                val preview = requireNotNull(BitmapFactory.decodeFile(File(dir, "preview.jpg").path)) { "无法读取页面预览" }
-                val quad = item.getJSONArray("quad")
-                add(ScannedPage(id = id, sourceBitmap = preview, previewBitmap = preview,
-                    sourceImagePath = source.path, processedImagePath = processed.path,
-                    contentRevision = item.getString("contentRevision"), imageStyle = item.getString("imageStyle"),
-                    rotationDegrees = item.getDouble("rotationDegrees").toFloat(),
-                    correctionMode = SimpleDocumentScanner.CorrectionMode.valueOf(item.getString("correctionMode")),
-                    editableQuad = (0 until quad.length()).map { n ->
-                        val point = quad.getJSONArray(n)
-                        PointF(point.getDouble(0).toFloat(), point.getDouble(1).toFloat())
-                    }))
+        check(manifestFile.canonicalPath.startsWith(root.canonicalPath + File.separator))
+        val manifest = parseDocumentManifest(manifestFile)
+        val legacy = manifest.schemaVersion == DocumentManifest.LEGACY_SCHEMA_VERSION
+        return manifest.pages.map { entry ->
+            val sourceFile = if (legacy) {
+                File(manifestFile.parentFile, "${entry.id}/source$SOURCE_EXT")
+            } else {
+                pageSourceFile(manifestFile.parentFile!!, entry)
+            }
+            require(sourceFile.isFile && sourceFile.length() > 0) { "文档页面文件缺失" }
+            val processedFile = if (legacy) {
+                File(manifestFile.parentFile, "${entry.id}/processed$PROCESSED_EXT")
+            } else {
+                processedCacheFile(manifestFile.parentFile!!, entry)
+            }
+            val processedPath = processedFile.takeIf { it.isFile && it.length() > 0 }?.path
+            val previewFile = if (legacy) {
+                File(manifestFile.parentFile, "${entry.id}/preview.jpg")
+            } else {
+                File(processedFile.parentFile, processedFile.nameWithoutExtension + PREVIEW_EXT)
+            }
+            // 预览优先用缓存；缓存缺失（可重建数据被清理）时降级解码原图，页面随后按未处理继续后台补处理。
+            val preview = requireNotNull(decodeDisplayBitmap(previewFile, sourceFile)) { "无法读取页面预览" }
+            ScannedPage(
+                id = entry.id,
+                sourceBitmap = preview,
+                previewBitmap = preview,
+                sourceImagePath = sourceFile.path,
+                processedImagePath = processedPath,
+                contentRevision = entry.contentRevision,
+                imageStyle = entry.imageStyle,
+                rotationDegrees = entry.rotationDegrees,
+                correctionMode = SimpleDocumentScanner.CorrectionMode.valueOf(entry.correctionMode),
+                editableQuad = entry.quad.map { PointF(it.x, it.y) }
+            )
+        }
+    }
+
+    /** 为已保存文档的页面计算处理缓存目标文件（后台处理直接写入文档缓存）。 */
+    fun processedCacheFileFor(documentDir: File, page: ScannedPage): File =
+        processedCacheFile(documentDir, buildEntry(page))
+
+    /** 已保存文档页面的原图文件路径（保存提交后重绑定内存页面使用）。 */
+    fun pageSourcePathFor(documentDir: File, page: ScannedPage): String =
+        pageSourceFile(documentDir, buildEntry(page)).path
+
+    fun pdfCacheFile(documentDir: File): File = File(File(documentDir, CACHE_DIR), PDF_NAME)
+
+    fun pdfMetaFile(pdfFile: File): File = File(pdfFile.path + PDF_META_SUFFIX)
+
+    /**
+     * 收敛清单（不写页面资产、不做清理）：按页面当前参数重写 document.json，
+     * 用于 PDF 按需生成时把后台补处理得到的四角 / 缓存键落盘。
+     * 兼容 schema 1：确保 v2 路径上存在不可变原图。
+     */
+    fun refreshManifest(documentDir: File, pages: List<ScannedPage>): String {
+        require(pages.isNotEmpty()) { "文档没有页面" }
+        val oldCoverSignature = readManifestOrNull(documentDir)?.coverSignature
+        val entries = pages.map { page ->
+            val entry = buildEntry(page)
+            val target = pageSourceFile(documentDir, entry)
+            if (!target.isFile) {
+                val existing = page.sourceImagePath?.let { File(it) }
+                if (existing != null && existing.isFile) {
+                    check(target.parentFile!!.isDirectory || target.parentFile!!.mkdirs()) { "无法创建页面目录" }
+                    runCatching { copyFileAtomically(existing, target) }
+                        .onFailure { Log.w("JuZiScan", "Could not migrate legacy page source", it) }
+                }
+            }
+            entry
+        }
+        val manifest = DocumentManifest(pages = entries, coverSignature = computeCoverSignature(entries.first()))
+        writeManifestAtomically(documentDir, manifest)
+        ensureThumbnail(documentDir, manifest, oldCoverSignature)
+        return File(documentDir, MANIFEST_NAME).absolutePath
+    }
+
+    fun invalidatePdfCache(documentDir: File) {
+        pdfCacheFile(documentDir).delete()
+        pdfMetaFile(pdfCacheFile(documentDir)).delete()
+    }
+
+    // ------------------------------------------------------------------
+    // 内部工具
+    // ------------------------------------------------------------------
+
+    private fun buildEntry(page: ScannedPage): ManifestPageEntry {
+        val quad = page.editableQuad.map { QuadPoint(it.x, it.y) }
+        return ManifestPageEntry(
+            id = page.id,
+            contentRevision = page.contentRevision,
+            cacheKey = computePageCacheKey(page.contentRevision, page.correctionMode.name, page.imageStyle, quad),
+            rotationDegrees = normalizePageRotation(page.rotationDegrees),
+            correctionMode = page.correctionMode.name,
+            imageStyle = page.imageStyle,
+            quad = quad
+        )
+    }
+
+    private fun readManifestOrNull(documentDir: File): DocumentManifest? {
+        val file = File(documentDir, MANIFEST_NAME)
+        if (!file.isFile || file.length() == 0L) return null
+        return try {
+            parseDocumentManifest(file)
+        } catch (error: Exception) {
+            Log.w("JuZiScan", "Document manifest unreadable, rebuilding", error)
+            null
+        }
+    }
+
+    private fun pageSourceFile(documentDir: File, entry: ManifestPageEntry): File =
+        File(File(documentDir, "$PAGES_DIR/${entry.id}"), entry.contentRevision + SOURCE_EXT)
+
+    private fun processedCacheDir(documentDir: File, pageId: String): File =
+        File(documentDir, "$CACHE_DIR/$PAGES_DIR/$pageId")
+
+    private fun processedCacheFile(documentDir: File, entry: ManifestPageEntry): File =
+        File(processedCacheDir(documentDir, entry.id), entry.cacheKey + PROCESSED_EXT)
+
+    private fun writeSourceAtomically(target: File, page: ScannedPage) {
+        val existing = page.sourceImagePath?.let { File(it) }
+        if (existing != null && existing.isFile) {
+            if (existing.canonicalPath == target.canonicalPath) return
+            copyFileAtomically(existing, target)
+        } else {
+            val bitmap = requireNotNull(page.sourceBitmap) { "页面尚未处理完成" }
+            writeBitmapFileAtomically(target, bitmap, Bitmap.CompressFormat.PNG, 100)
+        }
+    }
+
+    private fun writeProcessedCacheAtomically(target: File, page: ScannedPage) {
+        check(target.parentFile!!.isDirectory || target.parentFile!!.mkdirs()) { "无法创建页面缓存目录" }
+        val existing = page.processedImagePath?.let { File(it) }
+        when {
+            existing != null && existing.isFile -> {
+                if (existing.canonicalPath == target.canonicalPath) {
+                    // 后台处理已直接写入文档缓存。
+                } else {
+                    copyFileAtomically(existing, target)
+                }
+            }
+            else -> {
+                val bitmap = requireNotNull(page.processedBitmap) { "页面处理结果缺失" }
+                writeBitmapFileAtomically(target, bitmap, Bitmap.CompressFormat.PNG, 100)
             }
         }
-    }
-
-    private fun saveImage(file: File, existingPath: String?, bitmap: Bitmap?) {
-        if (existingPath != null) {
-            File(existingPath).inputStream().use { input -> writeSynced(file) { input.copyTo(it) } }
-        } else {
-            saveBitmap(file, requireNotNull(bitmap) { "页面尚未处理完成" }, Bitmap.CompressFormat.PNG)
+        // 处理图就位后同步落一份预览缓存，加速下次打开；缓存统一降采样，
+        // 保证重开文档时常驻位图不会比 640 缩图更大。
+        val previewSource = page.previewBitmap
+        if (previewSource != null) {
+            val previewFile = File(target.parentFile, target.nameWithoutExtension + PREVIEW_EXT)
+            runCatching {
+                val small = preparePreviewBitmap(previewSource, PREVIEW_MAX_SIDE)
+                try {
+                    writeBitmapFileAtomically(previewFile, small, Bitmap.CompressFormat.JPEG, 88)
+                } finally {
+                    if (small !== previewSource && !small.isRecycled) small.recycle()
+                }
+            }.onFailure { Log.w("JuZiScan", "Could not write page preview cache", it) }
         }
     }
 
-    private fun saveBitmap(file: File, bitmap: Bitmap, format: Bitmap.CompressFormat) = writeSynced(file) {
-        check(bitmap.compress(format, 92, it)) { "图片保存失败" }
+    private fun writeManifestAtomically(documentDir: File, manifest: DocumentManifest) {
+        writeBytesAtomically(File(documentDir, MANIFEST_NAME), manifest.toJsonBytes())
     }
 
-    private fun writeSynced(file: File, write: (FileOutputStream) -> Unit) {
-        FileOutputStream(file).use { output -> write(output); output.flush(); output.fd.sync() }
+    /**
+     * 索引写入失败时的补偿：把上一次有效清单原子写回，避免「内容已提交、索引仍指向旧状态」的不一致。
+     * 本次已写入的新页面资产变成未引用数据，会在下一次成功保存的清理阶段被回收。
+     */
+    fun restoreManifest(documentDir: File, manifestBytes: ByteArray) {
+        writeBytesAtomically(File(documentDir, MANIFEST_NAME), manifestBytes)
+    }
+
+    private fun ensureThumbnail(documentDir: File, manifest: DocumentManifest, oldCoverSignature: String?) {
+        val thumbnail = File(documentDir, THUMBNAIL_NAME)
+        if (thumbnail.isFile && oldCoverSignature == manifest.coverSignature) return
+        val first = manifest.pages.first()
+        val sourceFile = pageSourceFile(documentDir, first)
+        val previewCache = File(processedCacheDir(documentDir, first.id), first.cacheKey + PREVIEW_EXT)
+        val bitmap = decodeDisplayBitmap(previewCache, sourceFile) ?: run {
+            Log.w("JuZiScan", "Could not decode page for document thumbnail")
+            return
+        }
+        var rotated: Bitmap = bitmap
+        try {
+            if (first.rotationDegrees % 360f != 0f) {
+                rotated = SimpleDocumentScanner.rotate(bitmap, first.rotationDegrees)
+            }
+            val small = preparePreviewBitmap(rotated, 360)
+            try {
+                writeBitmapFileAtomically(thumbnail, small, Bitmap.CompressFormat.JPEG, 88)
+            } finally {
+                if (small !== rotated && !small.isRecycled) small.recycle()
+            }
+        } finally {
+            if (rotated !== bitmap && !rotated.isRecycled) rotated.recycle()
+            if (!bitmap.isRecycled) bitmap.recycle()
+        }
+    }
+
+    /** 提交后清理：未被新清单引用的页面目录 / 旧版本资产 / 遗留的版本目录（schema 1）。 */
+    private fun cleanupObsoleteAssets(documentDir: File, manifest: DocumentManifest, obsoleteFiles: List<File>) {
+        val referencedIds = manifest.pages.map { it.id }.toSet()
+        val pagesDir = File(documentDir, PAGES_DIR)
+        pagesDir.listFiles()?.forEach { pageDir ->
+            if (pageDir.name !in referencedIds) {
+                if (!pageDir.deleteRecursively()) Log.w("JuZiScan", "Could not remove unreferenced page dir")
+            } else {
+                // 只保留当前内容版本的不可变原图。
+                val revision = manifest.pages.first { it.id == pageDir.name }.contentRevision
+                pageDir.listFiles()?.forEach { file ->
+                    if (file.name != revision + SOURCE_EXT && file.name.endsWith(SOURCE_EXT)) {
+                        if (!file.delete()) Log.w("JuZiScan", "Could not remove obsolete page source")
+                    }
+                }
+            }
+        }
+        manifest.pages.forEach { entry ->
+            val cacheDir = processedCacheDir(documentDir, entry.id)
+            if (cacheDir.isDirectory) {
+                cacheDir.listFiles()?.forEach { file ->
+                    if (!file.name.startsWith(entry.cacheKey)) {
+                        if (!file.delete()) Log.w("JuZiScan", "Could not remove obsolete page cache")
+                    }
+                }
+            }
+        }
+        // 未提交页面的后台处理缓存（退出时放弃的页面）属于可重建缓存，随提交清理。
+        File(documentDir, "$CACHE_DIR/$PAGES_DIR").listFiles()?.forEach { dir ->
+            if (dir.name !in referencedIds) {
+                if (!dir.deleteRecursively()) Log.w("JuZiScan", "Could not remove orphan page cache")
+            }
+        }
+        obsoleteFiles.forEach { it.delete() }
+        // schema 1 的版本目录不再是合法子目录，直接清除。
+        val allowed = setOf(MANIFEST_NAME, THUMBNAIL_NAME, PAGES_DIR, CACHE_DIR)
+        documentDir.listFiles()?.forEach { child ->
+            if (child.name !in allowed) child.deleteRecursively()
+        }
+    }
+
+    private fun decodeDisplayBitmap(previewCache: File, sourceFile: File): Bitmap? {
+        if (previewCache.isFile && previewCache.length() > 0) {
+            BitmapFactory.decodeFile(previewCache.path)?.let { return it }
+        }
+        // 预览缓存缺失（可重建数据被清理）时降级解码原图，尺寸仍受 PREVIEW_MAX_SIDE 约束。
+        return decodeBitmapFromFileBounded(sourceFile.path, PREVIEW_MAX_SIDE)
+    }
+
+    private fun copyFileAtomically(source: File, target: File) {
+        val tmp = File(target.parentFile, target.name + TMP_SUFFIX)
+        source.inputStream().use { input ->
+            FileOutputStream(tmp).use { output ->
+                input.copyTo(output)
+                output.flush()
+                output.fd.sync()
+            }
+        }
+        replaceFile(tmp, target)
+    }
+
+    private fun writeBitmapFileAtomically(target: File, bitmap: Bitmap, format: Bitmap.CompressFormat, quality: Int) {
+        val tmp = File(target.parentFile, target.name + TMP_SUFFIX)
+        writeBitmapSynced(tmp, bitmap, format, quality)
+        replaceFile(tmp, target)
+    }
+
+    private fun writeBytesAtomically(target: File, bytes: ByteArray) {
+        val tmp = File(target.parentFile, target.name + TMP_SUFFIX)
+        FileOutputStream(tmp).use { output ->
+            output.write(bytes)
+            output.flush()
+            output.fd.sync()
+        }
+        replaceFile(tmp, target)
+    }
+
+    private fun replaceFile(tmp: File, target: File) {
+        if (target.exists() && !target.delete()) {
+            tmp.delete()
+            throw IOException("无法替换文件: ${target.name}")
+        }
+        check(tmp.renameTo(target)) { "无法提交文件: ${target.name}" }
+    }
+
+    private companion object {
+        const val MANIFEST_NAME = "document.json"
+        const val THUMBNAIL_NAME = "thumbnail.jpg"
+        const val PAGES_DIR = "pages"
+        const val CACHE_DIR = "cache"
+        const val PDF_NAME = "document.pdf"
+        const val PDF_META_SUFFIX = ".meta"
+        const val SOURCE_EXT = ".png"
+        const val PROCESSED_EXT = ".png"
+        const val PREVIEW_EXT = ".jpg"
+        const val TMP_SUFFIX = ".tmp"
+        /** 常驻预览图的边长上限：持久化预览缓存与降级解码统一受此约束，控制历史列表/预览的内存峰值。 */
+        const val PREVIEW_MAX_SIDE = 640
     }
 }

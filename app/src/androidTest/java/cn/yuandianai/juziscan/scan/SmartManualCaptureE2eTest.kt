@@ -93,7 +93,8 @@ class SmartManualCaptureE2eTest {
             history.loadRecords().any { it.createdAtMillis >= startedAt && it.pageCount == 5 }
         }
         val saved = history.loadRecords().first { it.createdAtMillis >= startedAt && it.pageCount == 5 }
-        ParcelFileDescriptor.open(File(saved.filePath), ParcelFileDescriptor.MODE_READ_ONLY).use { fd ->
+        // PDF 按需生成：需要时才生成完整文档。
+        ParcelFileDescriptor.open(history.ensureDocumentPdf(saved.id), ParcelFileDescriptor.MODE_READ_ONLY).use { fd ->
             PdfRenderer(fd).use { assertEquals(5, it.pageCount) }
         }
         ui.activityRule.scenario.recreate()

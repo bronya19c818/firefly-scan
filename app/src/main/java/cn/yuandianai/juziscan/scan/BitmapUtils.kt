@@ -188,8 +188,31 @@ fun loadBitmapFromUri(
     }
 }
 
-fun prepareAvatarJpeg(context: Context, uri: Uri, maxSide: Int = 512): ByteArray? {
-    val source = loadBitmapFromUri(context, uri, maxSide) ?: return null
+/** 按上界从磁盘解码位图；原图只需可靠持久化，重开文档不重复全尺寸驻留内存。 */
+fun decodeBitmapFromFileBounded(path: String, maxSide: Int): Bitmap? {
+    val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+    BitmapFactory.decodeFile(path, bounds)
+    if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
+    var sampleSize = 1
+    while (max(bounds.outWidth / sampleSize, bounds.outHeight / sampleSize) > maxSide * 2) {
+        sampleSize *= 2
+    }
+    val options = BitmapFactory.Options().apply {
+        inSampleSize = sampleSize
+        inPreferredConfig = Bitmap.Config.ARGB_8888
+    }
+    val decoded = BitmapFactory.decodeFile(path, options) ?: return null
+    val (targetWidth, targetHeight) = calculateBoundedDimensions(decoded.width, decoded.height, maxSide)
+    return if (targetWidth == decoded.width && targetHeight == decoded.height) {
+        decoded
+    } else {
+        Bitmap.createScaledBitmap(decoded, targetWidth, targetHeight, true).also {
+            if (it !== decoded) decoded.recycle()
+        }
+    }
+}
+
+fun prepareAvatarJpeg(context: Context, uri: Uri, maxSide: Int = 512): ByteArray? {    val source = loadBitmapFromUri(context, uri, maxSide) ?: return null
     val longestSide = max(source.width, source.height)
     val avatar = if (longestSide <= maxSide) {
         source

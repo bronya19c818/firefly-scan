@@ -3,6 +3,7 @@ package cn.yuandianai.juziscan.scan.ui
 import android.graphics.Bitmap
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
@@ -17,6 +18,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.produceState
 import androidx.compose.ui.platform.LocalContext
 import android.net.Uri
+import android.content.Context
 import android.util.Log
 import java.io.File
 import kotlinx.coroutines.Dispatchers
@@ -31,6 +33,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import cn.yuandianai.juziscan.common.*
 import cn.yuandianai.juziscan.scan.ScannedPage
+import cn.yuandianai.juziscan.scan.PageProcessingPhase
 import cn.yuandianai.juziscan.scan.loadBitmapFromUri
 import cn.yuandianai.juziscan.scan.preparePreviewBitmap
 import cn.yuandianai.juziscan.ui.theme.HpSmartColors
@@ -48,7 +51,10 @@ fun PreviewResultScreen(
     onEdit: () -> Unit,
     onReplace: () -> Unit,
     onDelete: () -> Unit,
-    onReorder: () -> Unit
+    onReorder: () -> Unit,
+    // 新增参数统一放在末尾，保持既有调用点的位置参数兼容。
+    pagePhases: Map<String, PageProcessingPhase> = emptyMap(),
+    onRetryPage: (String) -> Unit = {}
 ) {
     var menuOpen by remember { mutableStateOf(false) }
 
@@ -133,20 +139,26 @@ fun PreviewResultScreen(
                 val page = pages[pageIdx]
                 val context = LocalContext.current
                 val isCurrent = pageIdx == activeIndex
-                // Keep the document's thumbnails small; decode detail only for the visible page.
-                val detailedPreview by produceState<Bitmap?>(null, page.id, page.contentRevision,
-                    page.processedImagePath, page.processedBitmap, isCurrent) {
+                // 两级显示：当前页加载高清处理图；未处理页面先用快速预览占位，
+                // 其余页面只保留小图，避免同时持有大量 Bitmap。
+                val displayBitmap by produceState<Bitmap?>(
+                    null, page.id, page.contentRevision, page.processedImagePath,
+                    page.processedBitmap, page.previewBitmap, isCurrent
+                ) {
                     value = null
-                    if (isCurrent) {
-                        value = withContext(Dispatchers.IO) {
-                            try {
-                                page.processedImagePath?.let {
+                    value = withContext(Dispatchers.IO) {
+                        try {
+                            if (isCurrent) {
+                                val detailed = page.processedImagePath?.let {
                                     loadBitmapFromUri(context, Uri.fromFile(File(it)), 2048)
                                 } ?: page.processedBitmap?.let { preparePreviewBitmap(it, 2048) }
-                            } catch (error: Exception) {
-                                Log.w("JuZiScan", "Could not load detailed page preview", error)
-                                null
+                                detailed ?: quickPagePreview(context, page)
+                            } else {
+                                quickPagePreview(context, page)
                             }
+                        } catch (error: Exception) {
+                            Log.w("JuZiScan", "Could not load page preview", error)
+                            page.previewBitmap
                         }
                     }
                 }
@@ -154,12 +166,26 @@ fun PreviewResultScreen(
                     modifier = Modifier.fillMaxSize(),
                     contentAlignment = Alignment.Center
                 ) {
-                    RotatedPreviewImage(
-                        bitmap = detailedPreview ?: requireNotNull(page.previewBitmap),
-                        rotationDegrees = pages[pageIdx].rotationDegrees,
-                        contentDescription = "扫描预览 ${pageIdx + 1}",
-                        modifier = Modifier.fillMaxSize()
-                    )
+                    val bitmap = displayBitmap
+                    if (bitmap != null) {
+                        RotatedPreviewImage(
+                            bitmap = bitmap,
+                            rotationDegrees = pages[pageIdx].rotationDegrees,
+                            contentDescription = "扫描预览 ${pageIdx + 1}",
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    }
+                    // 单页处理状态：未完成处理的页面明确提示，不误导为最终成品。
+                    when (pagePhases[page.id]) {
+                        PageProcessingPhase.PENDING -> PageStatusBadge(text = "等待处理…")
+                        PageProcessingPhase.PROCESSING -> PageStatusBadge(text = "正在处理这一页…")
+                        PageProcessingPhase.FAILED -> PageStatusBadge(
+                            text = "处理失败，点击重试",
+                            failed = true,
+                            onClick = { onRetryPage(page.id) }
+                        )
+                        else -> Unit
+                    }
                 }
             }
 
@@ -279,6 +305,16 @@ private fun PopupMenuItem(
     }
 }
 
+/**
+ * 未处理页面的快速预览：优先复用已有缩略图，其次按需降采样原图。
+ * 结果只是占位画面，页面仍处于处理中时会叠加处理状态提示。
+ */
+private suspend fun quickPagePreview(context: Context, page: ScannedPage): Bitmap? =
+    page.previewBitmap ?: runCatching {
+        page.sourceImagePath?.let { loadBitmapFromUri(context, Uri.fromFile(File(it)), 720) }
+            ?: preparePreviewBitmap(page.sourceBitmap, 720)
+    }.getOrNull()
+
 @Composable
 private fun DividerHorizontal() {
     Box(
@@ -287,4 +323,39 @@ private fun DividerHorizontal() {
             .height(1.dp)
             .background(Color(0xFFE5E6F2))
     )
+}
+
+@Composable
+private fun BoxScope.PageStatusBadge(
+    text: String,
+    failed: Boolean = false,
+    onClick: (() -> Unit)? = null
+) {
+    val shape = RoundedCornerShape(14.dp)
+    Row(
+        modifier = Modifier
+            .align(Alignment.BottomCenter)
+            .padding(bottom = 52.dp)
+            .background(if (failed) Color(0xFFFFF1F0) else Color.White, shape)
+            .border(1.dp, if (failed) Color(0xFFFFC7C2) else Color(0xFFE5E6F2), shape)
+            .clickable(enabled = onClick != null) { onClick?.invoke() }
+            .padding(horizontal = 14.dp, vertical = 7.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier
+                .size(7.dp)
+                .background(
+                    if (failed) Color(0xFFD4380D) else Color(0xFF0B63FF),
+                    androidx.compose.foundation.shape.CircleShape
+                )
+        )
+        Spacer(modifier = Modifier.width(8.dp))
+        Text(
+            text = text,
+            color = if (failed) Color(0xFFD4380D) else HpSmartColors.TextPrimary,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.Medium
+        )
+    }
 }

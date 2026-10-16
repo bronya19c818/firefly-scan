@@ -92,7 +92,7 @@ class HistoryProcessRestartE2eTest {
         ui.waitUntil(90_000) { repository.loadRecords().any { it.createdAtMillis >= started && it.pageCount == 3 } }
         val record = repository.loadRecords().first { it.createdAtMillis >= started && it.pageCount == 3 }
         val pages = repository.loadDocumentPages(record.id)
-        assertEquals(3, pdfCount(File(record.filePath)))
+        assertEquals(3, pdfCount(repository.ensureDocumentPdf(record.id)))
         fixture.writeText(JSONObject().put("id", record.id).put("createdAtMillis", record.createdAtMillis)
             .put("threePid", Process.myPid()).put("originalIds", JSONArray(pages.map { it.id }))
             .put("originalHashes", JSONArray(pages.map { digest(File(requireNotNull(it.sourceImagePath))) })).toString())
@@ -123,7 +123,7 @@ class HistoryProcessRestartE2eTest {
         assertEquals((0..2).map { metadata.getJSONArray("originalHashes").getString(it) },
             pages.take(3).map { digest(File(requireNotNull(it.sourceImagePath))) })
         assertEquals(1, repository.loadRecords().count { it.id == id })
-        assertEquals(5, pdfCount(File(record.filePath)))
+        assertEquals(5, pdfCount(repository.ensureDocumentPdf(record.id)))
         metadata.put("fivePid", Process.myPid()).put("fiveIds", JSONArray(pages.map { it.id }))
             .put("autoCaptureVerified", true)
         fixture.writeText(metadata.toString())
@@ -137,7 +137,7 @@ class HistoryProcessRestartE2eTest {
         val record = repository.loadRecords().first { it.id == id }
         val pages = repository.loadDocumentPages(id)
         assertEquals((0..4).map { metadata.getJSONArray("fiveIds").getString(it) }, pages.map { it.id })
-        assertEquals(5, pdfCount(File(record.filePath)))
+        assertEquals(5, pdfCount(repository.ensureDocumentPdf(record.id)))
         val files = File(requireNotNull(record.documentManifestPath)).parentFile!!.walkTopDown().filter { it.isFile }.toList() +
             File(context.filesDir, "history/records.json")
         val timestamps = files.associate { it.path to it.lastModified() }
@@ -162,7 +162,7 @@ class HistoryProcessRestartE2eTest {
         assertEquals(5, pdfCount(printed))
         screenshot("process-five-page-system-print")
         instrumentation.uiAutomation.performGlobalAction(AccessibilityService.GLOBAL_ACTION_BACK)
-        File(record.filePath).copyTo(File(artifacts, "five-page-document.pdf"), overwrite = true)
+        repository.ensureDocumentPdf(record.id).copyTo(File(artifacts, "five-page-document.pdf"), overwrite = true)
         metadata.put("verifiedPid", Process.myPid()).put("pdfPages", 5).put("shareOpened", true)
             .put("printOpened", true).put("noOpFilesUnchanged", true)
         fixture.writeText(metadata.toString())

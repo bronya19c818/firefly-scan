@@ -153,13 +153,15 @@ class HistoryRescanE2eTest {
         try {
             ready()
             open(record.id)
-            val previousPdf = File(record.filePath).readBytes()
+            // 失败保存的对照物是已提交的清单（PDF 已改为按需生成，保存时不再存在）。
+            val previousManifest = File(requireNotNull(record.documentManifestPath)).readBytes()
             ownsBlocker = blocked.mkdir()
             check(ownsBlocker)
             File(blocked, "blocked").writeText("simulate index write failure")
             ui.onNodeWithText("旋转").performTouchInput { click() }
             ui.waitUntil(60_000) { ui.onAllNodesWithText("文档未保存").fetchSemanticsNodes().isNotEmpty() }
-            assertArrayEquals(previousPdf, File(record.filePath).readBytes())
+            assertArrayEquals("失败保存不得推进已提交清单",
+                previousManifest, File(requireNotNull(record.documentManifestPath)).readBytes())
             assertEquals(record, repository.loadRecords().first { it.id == record.id })
             evidence("save-failed-original-retained")
             check(blocked.deleteRecursively())

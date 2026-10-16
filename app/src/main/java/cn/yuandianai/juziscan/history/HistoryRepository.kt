@@ -14,10 +14,13 @@ import cn.yuandianai.juziscan.scan.ExportFileType
 import cn.yuandianai.juziscan.scan.IdCardDocumentType
 import cn.yuandianai.juziscan.scan.ScannedPage
 import cn.yuandianai.juziscan.scan.documentFingerprint
+import cn.yuandianai.juziscan.scan.processDocumentPage
+import cn.yuandianai.juziscan.scan.writePdfToStream
 import cn.yuandianai.juziscan.scan.writeSingleImageToFile
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
+import java.io.FileOutputStream
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -47,9 +50,12 @@ class HistoryRepository(private val context: Context) {
         }.sortedByDescending { it.updatedAtMillis }
     }
 
+    /**
+     * 增量保存：只写入新增或真正变化的页面资产，清单原子提交；
+     * 不再生成 PDF，也不复制整份文档。页面尚未完成处理不妨碍原始数据保存。
+     */
     fun saveDocumentRecord(pages: List<ScannedPage>, recordId: String? = null): HistoryRecord = synchronized(storageLock) {
         require(pages.isNotEmpty()) { "No pages to save." }
-        require(pages.all { it.isProcessed }) { "页面尚未处理完成" }
         val previous = recordId?.let { id -> loadRecords().firstOrNull { it.id == id }
             ?: error("原文档不存在") }
         require(previous == null || previous.kind == HistoryRecordKind.Document)
@@ -57,10 +63,14 @@ class HistoryRepository(private val context: Context) {
         if (previous?.documentFingerprint == fingerprint) return previous
         val now = maxOf(System.currentTimeMillis(), (previous?.updatedAtMillis ?: 0L) + 1)
         val id = previous?.id ?: UUID.randomUUID().toString()
-        val directory = File(File(documentsDir, id).apply { mkdirs() }, UUID.randomUUID().toString())
+        val documentDir = File(documentsDir, id)
+        // 索引是文档记录的提交点，清单是文档内容的提交点：后者先落盘，前者失败时必须回滚后者。
+        val rollbackManifest = previous?.documentManifestPath
+            ?.let { runCatching { File(it).readBytes() }.getOrNull() }
         var committed = false
         try {
-            documentStore.writeVersion(directory, pages)
+            check(documentDir.exists() || documentDir.mkdirs()) { "无法创建文档目录" }
+            documentStore.save(documentDir, pages)
             val record = HistoryRecord(
                 id = id,
                 kind = HistoryRecordKind.Document,
@@ -69,33 +79,28 @@ class HistoryRepository(private val context: Context) {
                 createdAtMillis = previous?.createdAtMillis ?: now,
                 pageCount = pages.size,
                 fileName = previous?.fileName ?: "桔子扫描_文件扫描_${timestampToken(now)}.pdf",
-                filePath = File(directory, "document.pdf").absolutePath,
+                filePath = documentStore.pdfCacheFile(documentDir).absolutePath,
                 mimeType = "application/pdf",
-                thumbnailPath = File(directory, "thumbnail.jpg").absolutePath,
+                thumbnailPath = File(documentDir, "thumbnail.jpg").absolutePath,
                 updatedAtMillis = now,
-                documentManifestPath = File(directory, "document.json").absolutePath,
+                documentManifestPath = File(documentDir, "document.json").absolutePath,
                 documentFingerprint = fingerprint
             )
-            upsert(record)
-            committed = true
-            // Cleanup is after the commit and cannot turn a successful save into a failure.
-            runCatching {
-                val liveVersions = loadRecords().filter { it.kind == HistoryRecordKind.Document }
-                    .associate { it.id to it.documentManifestPath?.let { path -> File(path).parentFile } }
-                documentsDir.listFiles()?.forEach { document ->
-                    val live = liveVersions[document.name]
-                    val obsolete = if (live == null) listOf(document)
-                        else document.listFiles()?.filter { it != live }.orEmpty()
-                    obsolete.forEach {
-                        if (!it.deleteRecursively()) Log.w("JuZiScan", "Could not remove obsolete document version")
-                    }
+            runCatching { upsert(record) }.onFailure { error ->
+                // 索引提交失败：回滚已提交的清单，否则文档内容会领先于索引，用户会看到「未保存」但内容已变。
+                rollbackManifest?.let { bytes ->
+                    runCatching { documentStore.restoreManifest(documentDir, bytes) }
+                        .onFailure { rollback -> Log.w("JuZiScan", "Could not roll back document manifest", rollback) }
                 }
-            }.onFailure {
-                Log.w("JuZiScan", "Could not clean obsolete document versions", it)
+                throw error
             }
+            committed = true
             return record
         } finally {
-            if (!committed) directory.deleteRecursively()
+            // 新建文档保存失败可整体回退；已有文档依赖旧清单继续指向旧资产。
+            if (!committed && previous == null) {
+                runCatching { documentDir.deleteRecursively() }
+            }
         }
     }
 
@@ -103,6 +108,65 @@ class HistoryRepository(private val context: Context) {
         val record = loadRecords().firstOrNull { it.id == recordId && it.kind == HistoryRecordKind.Document }
             ?: error("文档不存在")
         documentStore.loadPages(requireNotNull(record.documentManifestPath) { "文档页面数据不存在" })
+    }
+
+    /** 已保存文档某页的处理缓存目标（后台逐页处理直接写入文档缓存）。 */
+    fun processedCacheFileFor(recordId: String, page: ScannedPage): File? {
+        val documentDir = File(documentsDir, recordId)
+        return if (documentDir.isDirectory) documentStore.processedCacheFileFor(documentDir, page) else null
+    }
+
+    /** 已保存文档的页面文件路径（保存提交后重绑定内存页面使用）。 */
+    fun pageAssetPaths(recordId: String, page: ScannedPage): Pair<String, String?> {
+        val documentDir = File(documentsDir, recordId)
+        val sourcePath = documentStore.pageSourcePathFor(documentDir, page)
+        val processedPath = if (page.isProcessed) documentStore.processedCacheFileFor(documentDir, page).path else null
+        return sourcePath to processedPath
+    }
+
+    /**
+     * PDF 按需生成与缓存复用：
+     * - 文档指纹未变化且缓存存在 → 直接复用；
+     * - 缺失或失效 → 补齐未处理页面后重新生成并替换缓存。
+     * 文档自动保存不再触发本方法，仅分享 / 打开 / 导出等明确需要 PDF 时调用。
+     */
+    fun ensureDocumentPdf(recordId: String): File = synchronized(storageLock) {
+        val record = loadRecords().firstOrNull { it.id == recordId && it.kind == HistoryRecordKind.Document }
+            ?: error("文档不存在")
+        val manifestPath = requireNotNull(record.documentManifestPath) { "文档页面数据不存在" }
+        val documentDir = File(documentsDir, record.id)
+        val pdfFile = documentStore.pdfCacheFile(documentDir)
+        val metaFile = documentStore.pdfMetaFile(pdfFile)
+        val fingerprint = record.documentFingerprint
+        if (pdfFile.isFile && metaFile.isFile && fingerprint != null &&
+            metaFile.readText(Charsets.UTF_8) == fingerprint
+        ) {
+            return pdfFile
+        }
+
+        val pages = documentStore.loadPages(manifestPath)
+        val processedPages = pages.map { page ->
+            val target = documentStore.processedCacheFileFor(documentDir, page)
+            when {
+                target.isFile && target.length() > 0 -> page
+                page.processedImagePath?.let { File(it).isFile && File(it).length() > 0 } == true -> {
+                    // schema 1 遗留处理图迁移到新缓存位置。
+                    check(target.parentFile!!.isDirectory || target.parentFile!!.mkdirs()) { "无法创建页面缓存目录" }
+                    File(page.processedImagePath!!).copyTo(target, overwrite = true)
+                    page.copy(processedImagePath = target.path)
+                }
+                else -> processDocumentPage(context, page, target)
+            }
+        }
+        // 后台补处理可能完善了四角，收敛清单与缓存键（失败不阻断 PDF 生成）。
+        val refreshedManifestPath = runCatching { documentStore.refreshManifest(documentDir, processedPages) }
+            .onFailure { Log.w("JuZiScan", "Could not refresh manifest during PDF export", it) }
+            .getOrNull()
+        writePdfCacheFile(pdfFile, processedPages, fingerprint)
+        if (refreshedManifestPath != null && refreshedManifestPath != record.documentManifestPath) {
+            upsert(record.copy(documentManifestPath = refreshedManifestPath))
+        }
+        return pdfFile
     }
 
     fun saveIdCardRecord(
@@ -222,8 +286,12 @@ class HistoryRepository(private val context: Context) {
     }
 
     private fun prepareExternalFile(record: HistoryRecord): Pair<String, android.net.Uri> {
-        val sourceFile = File(record.filePath)
-        require(sourceFile.isFile) { "文档文件不存在，可能已被清理" }
+        // 文档记录不再保证随时存在最新 PDF；需要时按指纹生成或复用缓存。
+        val sourceFile = if (record.kind == HistoryRecordKind.Document && record.documentManifestPath != null) {
+            ensureDocumentPdf(record.id)
+        } else {
+            File(record.filePath).also { require(it.isFile) { "文档文件不存在，可能已被清理" } }
+        }
         val displayName = record.fileName
             .let { if (it.startsWith("桔子扫描_")) it else "桔子扫描_$it" }
         val externalFile = File(context.cacheDir, displayName)
@@ -234,6 +302,28 @@ class HistoryRepository(private val context: Context) {
             externalFile
         )
         return displayName to uri
+    }
+
+    private fun writePdfCacheFile(pdfFile: File, pages: List<ScannedPage>, fingerprint: String?) {
+        val cacheDir = pdfFile.parentFile
+        check(cacheDir != null && (cacheDir.isDirectory || cacheDir.mkdirs())) { "无法创建 PDF 缓存目录" }
+        val tmp = File(cacheDir, pdfFile.name + ".tmp")
+        FileOutputStream(tmp).use { output ->
+            writePdfToStream(output, pages, ExportFileSize.Actual)
+            output.flush()
+            output.fd.sync()
+        }
+        if (pdfFile.exists() && !pdfFile.delete()) {
+            tmp.delete()
+            throw IllegalStateException("PDF 缓存替换失败")
+        }
+        check(tmp.renameTo(pdfFile)) { "PDF 缓存写入失败" }
+        val metaFile = documentStore.pdfMetaFile(pdfFile)
+        FileOutputStream(metaFile).use { output ->
+            output.write((fingerprint ?: "").toByteArray(Charsets.UTF_8))
+            output.flush()
+            output.fd.sync()
+        }
     }
 
     fun decodeThumbnail(record: HistoryRecord): Bitmap? {

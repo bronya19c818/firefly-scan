@@ -33,6 +33,10 @@ class ScanViewModel {
 
     var pages by mutableStateOf<List<ScannedPage>>(emptyList())
     var activeIndex by mutableStateOf(0)
+    /** 逐页后台处理状态，键为页面 ID；与文档永久编辑参数分离。 */
+    var pagePhases by mutableStateOf<Map<String, PageProcessingPhase>>(emptyMap())
+    /** 增量保存进行中（静默后台执行，不阻塞浏览）。 */
+    var isSavingDocument by mutableStateOf(false)
     var replacingIndex by mutableStateOf<Int?>(null)
     var pendingSingleResult by mutableStateOf<ScannedPage?>(null)
     var ocrUiState by mutableStateOf(OcrUiState())
@@ -92,6 +96,8 @@ class ScanViewModel {
         documentReturnStage = ScanStage.Home
         currentOcrRecordId = null
         currentIdCardRecordId = null
+        pagePhases = emptyMap()
+        isSavingDocument = false
     }
 
     fun resetAutoCaptureHint() {
@@ -109,6 +115,8 @@ class ScanViewModel {
     fun startEntry(entry: ScanEntry, openCapture: Boolean = true) {
         pages = emptyList()
         activeIndex = 0
+        pagePhases = emptyMap()
+        isSavingDocument = false
         replacingIndex = null
         pendingSingleResult = null
         ocrUiState = OcrUiState()
@@ -151,6 +159,8 @@ class ScanViewModel {
     fun returnToHome() {
         pages = emptyList()
         activeIndex = 0
+        pagePhases = emptyMap()
+        isSavingDocument = false
         replacingIndex = null
         pendingSingleResult = null
         ocrUiState = OcrUiState()
