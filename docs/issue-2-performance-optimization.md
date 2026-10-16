@@ -142,6 +142,14 @@ JVM 单测分布：`DocumentManifestTest` 11、`PageProcessingQueueTest` 10、`B
 5. **并发写同一页缓存互相踩踏**：后台队列与 `ensureDocumentPdf` 的缺页补处理共用固定 tmp 文件名，一方 `renameTo` 后另一方的 `renameTo` 失败并抛「页面暂存失败」。改为 tmp 名带随机后缀；目标已由并发写入者写好的情况下直接复用，不重复覆盖。
 6. **可重建缓存被清理后永不重建**：`isProcessed` 只判断路径是否非空，缓存文件消失后页面仍被当作已处理，后台不再补处理。新增 `ScannedPage.hasProcessedOutput`（以磁盘实际存在为准），队列提交、结果版本绑定、导出就绪判据与保存后重绑定统一改用；保存成功后补调 `submitPendingPages()`，缺缓存的页自动补齐。相应地 `missingTemporaryPagesAreReprocessedOnRetryWithoutLosingOriginal` 改为验证「新增页处理缓存落在文档缓存目录 → 删除 → 重试后自动重建、原图不丢」。
 7. 设备测试脚本的成功判据硬编码 `OK (14 tests)`，用例增减后误报失败 → 改为「无 FAILURES 且匹配 `OK (N tests)`」的数量无关判据，收尾文案按实际数量输出。
+8. **退出弹窗按钮文案与动作语义矛盾**（PR #4 补充验收 A）：自动持久化已落地，「退出后……将不会被保存」与「重新扫描」「放弃并返回首页」均会误导。按验收要求只改展示文案：`重新扫描 → 新的扫描`、`放弃并返回首页 → 暂存并返回首页`（`继续浏览` 语义已正确保持不变）；`onClick` 事件处理、状态变更与跳转逻辑零改动，OCR / 证件退出不受影响。
+9. **预览「重新排序」点击无反应**（B）：`onReorder` 先调 `documentActionBlocked()`，连拍数页后 `isSavingDocument` 与指纹未提交都会静默 return。拖动排序只改页面 ID 顺序元数据，与图像增强、缓存写入、PDF 无关 → 直接放开进入 `ScanStage.Reorder`，页面列表一出现即可排序。
+10. **自动保存回填覆盖用户新排序**：保存协程挂起期间用户完成排序后，`pages = snapshot.map { ... }` 用旧顺序快照整表覆盖。改为以当前 UI 列表顺序为基准、按稳定页 ID 合并提交后的持久化路径（`pageAssetPaths(record.id, committed)`），被删页不复活、新顺序不回退。
+11. **`ReorderScreen` 拖动中顺序被后台处理重置**：`var localPages by remember(pages)` 的 key 在后台逐页处理刷新页面对象时重启状态，拖动中的顺序丢回传入顺序。改为维护稳定页 ID 顺序草稿（`SnapshotStateList<String>`）：`pages` 内容刷新只做增删同步；拖动 / 删除只操作 ID 草稿；「完成」时按 ID 合并最新页面对象提交。缩略图由 `requireNotNull(page.previewBitmap)` 改为 `previewBitmap ?: sourceBitmap`，未处理页用原图渲染，排序不再依赖处理缓存就绪。
+12. **`ensureDocumentPdf` 偶发 `Required value was null`**：后台补处理已把缓存写到文档目录、但清单尚未刷新时，`ensureDocumentPdf` 的「缓存已存在」分支直接返回清单页（`processedImagePath` 仍为 null），PDF 编码无可写位图。该分支改为按缓存文件回填 `target.path`，PDF 生成不再依赖清单刷新时序。
+13. **回归脚本在本机 PowerShell 下被 adb 的 stderr 误断**：`$ErrorActionPreference='Stop'` 把 daemon 启动信息与 pull 进度（NativeCommandError）当终止性错误；且 pull 写 stderr 时 `$LASTEXITCODE` 被污染为 `-1`（pull 实际成功）。改为已知良性 adb 调用统一 try/catch 兜噪声，pull 成败以工件是否真正落地为判据。
+
+**本轮复核**（OnePlus PKR110 / Android 16）：改动后重跑 `tools/run-history-rescan-e2e.ps1` 再次 **18 项全部通过**（基础回归 15 项 + 冷启动三阶段），应用日志零 error；排序相关用例单独复跑：`HistoryQualityAndReorderE2eTest` 2 项、`HistoryRescanE2eTest#reorderCropCancelAndDeleteAllPersistThroughExistingControls` 1 项均通过。`:app:lintDebug` 0 error，本轮改动文件（`ScanFlow.kt`、`ReorderScreen.kt`、`HistoryRepository.kt`）新增行零告警。
 
 ## 十、回归清单
 
