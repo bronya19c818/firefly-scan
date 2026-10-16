@@ -151,7 +151,9 @@ class HistoryRepository(private val context: Context) {
         val processedPages = pages.map { page ->
             val target = documentStore.processedCacheFileFor(documentDir, page)
             when {
-                target.isFile && target.length() > 0 -> page
+                // 缓存已在磁盘上：即便清单还没刷新（后台补处理先于清单提交），
+                // 也按缓存回填路径，PDF 生成不依赖内存位图或清单时序。
+                target.isFile && target.length() > 0 -> page.copy(processedImagePath = target.path)
                 page.processedImagePath?.let { File(it).isFile && File(it).length() > 0 } == true -> {
                     // schema 1 遗留处理图迁移到新缓存位置。
                     check(target.parentFile!!.isDirectory || target.parentFile!!.mkdirs()) { "无法创建页面缓存目录" }
