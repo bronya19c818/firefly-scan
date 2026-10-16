@@ -46,6 +46,10 @@ class ScanViewModel {
     var selectedIdCardLayout by mutableStateOf(IdCardLayoutOption.VerticalPair)
     var activeLegalDoc by mutableStateOf<LegalDocType?>(null)
     var currentDocumentRecordId by mutableStateOf<String?>(null)
+    var documentReturnStage by mutableStateOf(ScanStage.Home)
+    var openedFromHistory by mutableStateOf(false)
+    var savedDocumentFingerprint by mutableStateOf<String?>(null)
+    var documentSaveError by mutableStateOf(false)
     var currentOcrRecordId by mutableStateOf<String?>(null)
     var currentIdCardRecordId by mutableStateOf<String?>(null)
     var vipPurchaseInFlight by mutableStateOf(false)
@@ -82,6 +86,10 @@ class ScanViewModel {
         shareSaveReturnStage = ScanStage.Preview
         shareSaveDefaultWatermarkText = "仅供本人使用"
         currentDocumentRecordId = null
+        savedDocumentFingerprint = null
+        documentSaveError = false
+        openedFromHistory = false
+        documentReturnStage = ScanStage.Home
         currentOcrRecordId = null
         currentIdCardRecordId = null
     }
@@ -113,6 +121,10 @@ class ScanViewModel {
         selectedIdCardDocumentType = IdCardDocumentType.IdentityCard
         selectedIdCardLayout = IdCardLayoutOption.VerticalPair
         currentDocumentRecordId = null
+        savedDocumentFingerprint = null
+        documentSaveError = false
+        openedFromHistory = false
+        documentReturnStage = ScanStage.Home
         currentOcrRecordId = null
         currentIdCardRecordId = null
         clearEditingState()
@@ -151,6 +163,10 @@ class ScanViewModel {
         selectedIdCardDocumentType = IdCardDocumentType.IdentityCard
         selectedIdCardLayout = IdCardLayoutOption.VerticalPair
         currentDocumentRecordId = null
+        savedDocumentFingerprint = null
+        documentSaveError = false
+        openedFromHistory = false
+        documentReturnStage = ScanStage.Home
         currentOcrRecordId = null
         currentIdCardRecordId = null
         clearEditingState()

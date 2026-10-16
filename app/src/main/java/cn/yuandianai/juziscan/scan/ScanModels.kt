@@ -103,8 +103,26 @@ data class ScannedPage(
     val correctionMode: SimpleDocumentScanner.CorrectionMode = SimpleDocumentScanner.CorrectionMode.AUTO,
     val processedBitmap: Bitmap? = null,
     val previewBitmap: Bitmap? = null,
-    val rotationDegrees: Float = 0f
-)
+    val rotationDegrees: Float = 0f,
+    // File-backed pages retain only a small display bitmap until editing/export.
+    val sourceImagePath: String? = null,
+    val processedImagePath: String? = null,
+    val contentRevision: String = java.util.UUID.randomUUID().toString(),
+    val imageStyle: String = "default"
+) {
+    val isProcessed: Boolean get() = processedBitmap != null || processedImagePath != null
+}
+
+/** Paths and Bitmap identities are deliberately excluded: reloading is not an edit. */
+fun documentFingerprint(pages: List<ScannedPage>): String {
+    val value = pages.joinToString(";") { page ->
+        listOf(page.id, page.contentRevision, normalizePageRotation(page.rotationDegrees),
+            page.correctionMode.name, page.imageStyle,
+            page.editableQuad.joinToString(",") { "${it.x}:${it.y}" }).joinToString("|")
+    }
+    return java.security.MessageDigest.getInstance("SHA-256")
+        .digest(value.toByteArray(Charsets.UTF_8)).joinToString("") { "%02x".format(it) }
+}
 
 data class OcrUiState(
     val isRecognizing: Boolean = false,

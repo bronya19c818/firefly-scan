@@ -100,10 +100,24 @@ fun materializePageRotation(page: ScannedPage): ScannedPage {
             editableQuad = rotateQuadClockwise(rotatedPage.editableQuad),
             processedBitmap = rotatedProcessed,
             previewBitmap = preparePreviewBitmap(rotatedProcessed),
-            rotationDegrees = 0f
+            rotationDegrees = 0f,
+            sourceImagePath = null,
+            processedImagePath = null,
+            contentRevision = java.util.UUID.randomUUID().toString()
         )
     }
     return rotatedPage
+}
+
+/** Only the page being edited is hydrated; the document keeps small previews. */
+fun hydratePageForEditing(page: ScannedPage): ScannedPage {
+    val source = page.sourceImagePath?.let {
+        requireNotNull(BitmapFactory.decodeFile(it)) { "无法读取原始页面" }
+    } ?: page.sourceBitmap
+    val processed = page.processedImagePath?.let {
+        requireNotNull(BitmapFactory.decodeFile(it)) { "无法读取处理后的页面" }
+    } ?: page.processedBitmap
+    return page.copy(sourceBitmap = source, reviewBitmap = prepareWorkingBitmap(source), processedBitmap = processed)
 }
 
 const val SCAN_INPUT_MAX_SIDE = 2200

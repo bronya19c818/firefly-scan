@@ -124,7 +124,7 @@ fun HistoryRecordCard(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = formatHistoryTime(record.createdAtMillis),
+                    text = formatHistoryTime(record.updatedAtMillis),
                     color = Color(0xFF97A7C1),
                     fontSize = 12.sp,
                     maxLines = 1,

@@ -542,18 +542,20 @@ private inline fun <T> withPageExportBitmap(
     page: ScannedPage,
     block: (Bitmap) -> T
 ): T {
-    val originalBitmap = requireNotNull(page.processedBitmap)
-    val exportBitmap = if (page.rotationDegrees % 360f == 0f) {
-        originalBitmap
-    } else {
-        SimpleDocumentScanner.rotate(originalBitmap, page.rotationDegrees)
+    val loadedBitmap = page.processedImagePath?.let {
+        requireNotNull(android.graphics.BitmapFactory.decodeFile(it)) { "无法读取文档页面" }
     }
+    val originalBitmap = loadedBitmap ?: requireNotNull(page.processedBitmap)
     return try {
-        block(exportBitmap)
-    } finally {
-        if (exportBitmap !== originalBitmap) {
-            exportBitmap.recycle()
+        val exportBitmap = if (page.rotationDegrees % 360f == 0f) {
+            originalBitmap
+        } else {
+            SimpleDocumentScanner.rotate(originalBitmap, page.rotationDegrees)
         }
+        try { block(exportBitmap) }
+        finally { if (exportBitmap !== originalBitmap) exportBitmap.recycle() }
+    } finally {
+        loadedBitmap?.recycle()
     }
 }
 

@@ -52,17 +52,12 @@ class SmartManualCaptureE2eTest {
 
     @Test fun recognizedManualDocumentWaitsForShutterAndCollectsFivePages() {
         val startedAt = System.currentTimeMillis()
-        ParcelFileDescriptor.AutoCloseInputStream(
-            instrumentation.uiAutomation.executeShellCommand(
-                "pm grant ${instrumentation.targetContext.packageName} android.permission.CAMERA"
-            )
-        ).use { it.readBytes() }
-        // The activity may have cached its permission state before the shell grant.
         ui.activityRule.scenario.recreate()
         if (ui.onAllNodesWithText("我同意").fetchSemanticsNodes().isNotEmpty()) {
             ui.onNodeWithText("我同意").performClick()
         }
         ui.onNodeWithText("文件扫描").performTouchInput { click() }
+        enterCameraWhenReady(ui)
         ui.onNodeWithText("智能手拍").assertExists()
         ui.waitUntil(60_000) {
             ui.onAllNodesWithText("已识别文档，点击快门拍摄").fetchSemanticsNodes().isNotEmpty()
@@ -98,9 +93,13 @@ class SmartManualCaptureE2eTest {
             PdfRenderer(fd).use { assertEquals(5, it.pageCount) }
         }
         ui.activityRule.scenario.recreate()
+        ui.waitUntil(30_000) { ui.onAllNodesWithText(saved.title).fetchSemanticsNodes().isNotEmpty() }
         ui.onAllNodesWithText(saved.title)[0].performScrollTo().performTouchInput { click() }
-        // A real PDF handler or the system resolver must open; a toast leaves us resumed.
-        ui.waitUntil(10_000) { ui.activityRule.scenario.state != Lifecycle.State.RESUMED }
+        ui.waitUntil(60_000) {
+            ui.onAllNodesWithText("添加").fetchSemanticsNodes().isNotEmpty()
+        }
+        ui.onNodeWithText("预览").assertExists()
+        assertEquals(Lifecycle.State.RESUMED, ui.activityRule.scenario.state)
         screenshot("recent-document-opened")
     }
 }
