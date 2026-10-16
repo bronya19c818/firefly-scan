@@ -2578,7 +2578,7 @@ private fun ExitConfirmationDialog(
                 )
 
                 Text(
-                    text = "退出后，当前已扫描的页面/识别结果将不会被保存。",
+                    text = "退出后，当前已扫描的页面/识别结果将会被保存在最近文档。",
                     color = HpSmartColors.TextSecondary,
                     fontSize = 14.sp,
                     lineHeight = 20.sp,
