@@ -1332,15 +1332,23 @@ private fun ScannerFlowScreen(
                     savedDocumentFingerprint = record.documentFingerprint
                     // Record the committed identity before rebinding the UI pages so a
                     // later UI failure cannot retry a new document with another ID.
-                    pages = snapshot.map { page ->
-                        val (sourcePath, processedPath) = historyRepository.pageAssetPaths(record.id, page)
-                        page.copy(
-                            sourceImagePath = sourcePath,
-                            processedImagePath = processedPath,
-                            sourceBitmap = requireNotNull(page.previewBitmap ?: page.sourceBitmap),
-                            reviewBitmap = null,
-                            processedBitmap = null
-                        )
+                    // 保存挂起期间用户可能已完成新的排序：回填以当前 UI 列表的顺序为基准，
+                    // 按稳定页 ID 合并提交后的持久化路径，避免旧顺序覆盖用户的新排序。
+                    val committedById = snapshot.associateBy { it.id }
+                    pages = pages.map { current ->
+                        val committed = committedById[current.id]
+                        if (committed != null) {
+                            val (sourcePath, processedPath) = historyRepository.pageAssetPaths(record.id, committed)
+                            current.copy(
+                                sourceImagePath = sourcePath,
+                                processedImagePath = processedPath,
+                                sourceBitmap = requireNotNull(current.previewBitmap ?: current.sourceBitmap),
+                                reviewBitmap = null,
+                                processedBitmap = null
+                            )
+                        } else {
+                            current
+                        }
                     }
                     withContext(Dispatchers.IO) { clearTemporaryProcessedPages(context, snapshot) }
                     // 保存时缓存缺失或被清理的页面继续后台补齐，文档不会停在缺图状态。
@@ -1893,7 +1901,8 @@ private fun ScannerFlowScreen(
                                 }
                             },
                             onReorder = {
-                                if (documentActionBlocked()) return@PreviewResultScreen
+                                // 拖动排序只改页面 ID 的顺序元数据：页面列表一出现即可进入，
+                                // 不必等待增强、缓存写入或 PDF，保存中的事务也不阻塞排序。
                                 stage = ScanStage.Reorder
                             }
                         )
