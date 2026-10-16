@@ -30,4 +30,8 @@ internal fun enterCameraWhenReady(ui: AndroidComposeTestRule<*, MainActivity>) {
         }
     }
     ui.waitUntil(30_000) { ui.onAllNodesWithText("智能手拍").fetchSemanticsNodes().isNotEmpty() }
+    ui.waitUntil(30_000) {
+        !ui.onNodeWithContentDescription("拍摄").fetchSemanticsNode().config
+            .contains(androidx.compose.ui.semantics.SemanticsProperties.Disabled)
+    }
 }

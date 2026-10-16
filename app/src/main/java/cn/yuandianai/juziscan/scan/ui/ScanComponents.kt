@@ -101,6 +101,7 @@ fun TopSoftButton(
     Box(
         modifier = modifier
             .size(46.dp)
+            .semantics { contentDescription = "返回" }
             .background(HpSmartColors.SurfaceSoft, CircleShape)
             .pointerInput(Unit) { detectTapGesturesCompat(onClick) },
         contentAlignment = Alignment.Center

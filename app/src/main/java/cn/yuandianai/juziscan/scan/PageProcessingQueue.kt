@@ -22,6 +22,8 @@ enum class PageProcessingPhase {
     FAILED
 }
 
+class ObsoletePageResultException : IllegalStateException("页面已更新或文档已删除，旧处理结果已忽略")
+
 /**
  * 单页后台处理队列：
  * - 有限并发（默认 2），避免全速处理大量高清图像拖慢相机与界面；
@@ -41,6 +43,7 @@ class PageProcessingQueue(
 ) {
     private val scheduler = PriorityTaskScheduler()
     private var active = 0
+    val isIdle: Boolean get() = active == 0 && scheduler.isEmpty
 
     /** 提交一个待处理页面；已处理完成的直接标记 READY。 */
     fun submit(pageId: String) {
@@ -94,7 +97,8 @@ class PageProcessingQueue(
                             onPhaseChanged(pageId, null)
                         }
                     }
-                    outcome.exceptionOrNull() is CancellationException -> {
+                    outcome.exceptionOrNull() is CancellationException ||
+                        outcome.exceptionOrNull() is ObsoletePageResultException -> {
                         onPhaseChanged(pageId, null)
                     }
                     else -> {
@@ -125,6 +129,7 @@ fun shouldApplyProcessedPage(
  * 新者先执行（最近拍摄 / 修改的页面）。纯逻辑，便于单元测试。
  */
 internal class PriorityTaskScheduler {
+    val isEmpty: Boolean get() = tasks.isEmpty()
     private class Task(val pageId: String, val seq: Long) {
         var boostedAt: Long = 0L
     }

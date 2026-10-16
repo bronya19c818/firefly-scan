@@ -162,6 +162,7 @@ class HistoryProcessRestartE2eTest {
         assertEquals(5, pdfCount(printed))
         screenshot("process-five-page-system-print")
         instrumentation.uiAutomation.performGlobalAction(AccessibilityService.GLOBAL_ACTION_BACK)
+        ui.waitUntil(15_000) { !printed.exists() }
         repository.ensureDocumentPdf(record.id).copyTo(File(artifacts, "five-page-document.pdf"), overwrite = true)
         metadata.put("verifiedPid", Process.myPid()).put("pdfPages", 5).put("shareOpened", true)
             .put("printOpened", true).put("noOpFilesUnchanged", true)

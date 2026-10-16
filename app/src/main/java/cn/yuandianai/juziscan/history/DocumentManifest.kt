@@ -31,13 +31,21 @@ data class ManifestPageEntry(
     val rotationDegrees: Float,
     val correctionMode: String,
     val imageStyle: String,
-    val quad: List<QuadPoint>
+    val quad: List<QuadPoint>,
+    val sourceExtension: String = ".png"
 )
 
 data class DocumentManifest(
     val schemaVersion: Int = SCHEMA_VERSION,
     val pages: List<ManifestPageEntry>,
-    val coverSignature: String
+    val coverSignature: String,
+    val recordId: String? = null,
+    val createdAtMillis: Long = 0,
+    val updatedAtMillis: Long = 0,
+    val title: String? = null,
+    val fileName: String? = null,
+    val fingerprint: String? = null,
+    val version: Long = 0
 ) {
     fun findPage(pageId: String): ManifestPageEntry? = pages.firstOrNull { it.id == pageId }
 
@@ -94,9 +102,9 @@ fun computePageCacheKey(
     return sha256Hex(value)
 }
 
-/** 文档封面签名：仅由第一页的标识、内容版本与旋转决定。 */
+/** 裁剪与处理参数也影响封面，但不改变不可变原图的内容版本。 */
 fun computeCoverSignature(firstPage: ManifestPageEntry): String =
-    sha256Hex("${firstPage.id}|${firstPage.contentRevision}|${firstPage.rotationDegrees}")
+    sha256Hex("${firstPage.id}|${firstPage.contentRevision}|${firstPage.rotationDegrees}|${firstPage.cacheKey}")
 
 /**
  * 增量保存规划：对比旧清单条目与新的页面快照，决定该页需要写入哪些文件。
@@ -168,12 +176,20 @@ fun parseDocumentManifest(file: File): DocumentManifest {
                     rotationDegrees = item.optDouble("rotationDegrees", 0.0).toFloat(),
                     correctionMode = correctionMode,
                     imageStyle = imageStyle,
-                    quad = quad
+                    quad = quad,
+                    sourceExtension = item.optString("sourceExtension", ".png").also {
+                        require(it in setOf(".png", ".jpg")) { "无效原图格式" }
+                    }
                 )
             )
         }
     }
-    val manifest = DocumentManifest(pages = pages, coverSignature = root.optString("coverSignature"))
+    val manifest = DocumentManifest(schemaVersion = schemaVersion, pages = pages, coverSignature = root.optString("coverSignature"),
+        recordId = root.optString("recordId").takeIf { it.isNotBlank() && it != "null" },
+        createdAtMillis = root.optLong("createdAtMillis"), updatedAtMillis = root.optLong("updatedAtMillis"),
+        title = root.optString("title").takeIf { it.isNotBlank() && it != "null" },
+        fileName = root.optString("fileName").takeIf { it.isNotBlank() && it != "null" },
+        fingerprint = root.optString("fingerprint").takeIf { it.isNotBlank() && it != "null" }, version = root.optLong("version"))
     return if (manifest.coverSignature.isBlank()) {
         manifest.copy(coverSignature = computeCoverSignature(pages.first()))
     } else {
@@ -189,6 +205,7 @@ fun DocumentManifest.toJsonBytes(): ByteArray {
                 .put("id", page.id)
                 .put("contentRevision", page.contentRevision)
                 .put("cacheKey", page.cacheKey)
+                .put("sourceExtension", page.sourceExtension)
                 .put("rotationDegrees", page.rotationDegrees.toDouble())
                 .put("correctionMode", page.correctionMode)
                 .put("imageStyle", page.imageStyle)
@@ -201,6 +218,8 @@ fun DocumentManifest.toJsonBytes(): ByteArray {
     return JSONObject()
         .put("schemaVersion", schemaVersion)
         .put("coverSignature", coverSignature)
+        .put("recordId", recordId).put("createdAtMillis", createdAtMillis).put("updatedAtMillis", updatedAtMillis)
+        .put("title", title).put("fileName", fileName).put("fingerprint", fingerprint).put("version", version)
         .put("pages", pagesArray)
         .toString()
         .toByteArray(Charsets.UTF_8)

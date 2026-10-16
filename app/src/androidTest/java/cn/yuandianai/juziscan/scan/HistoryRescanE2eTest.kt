@@ -9,6 +9,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import cn.yuandianai.juziscan.MainActivity
 import cn.yuandianai.juziscan.history.HistoryRepository
+import cn.yuandianai.juziscan.history.DocumentSaveCoordinator
 import java.io.File
 import org.junit.Assert.*
 import org.junit.Rule
@@ -141,6 +142,9 @@ class HistoryRescanE2eTest {
                     if (remaining == 0) saved == null else saved?.pageCount == remaining
                 }
             }
+            // The durable tombstone hides the record before disposable-file cleanup finishes.
+            // Acknowledgement is the completed UI return, then no old task may recreate files.
+            ui.waitUntil(20_000) { ui.onAllNodesWithText("最近文档").fetchSemanticsNodes().isNotEmpty() }
             assertFalse(File(instrumentation.targetContext.filesDir, "history/documents/${record.id}").exists())
             evidence("deleted-last-page")
         } finally { repository.deleteRecord(record.id) }
@@ -160,9 +164,12 @@ class HistoryRescanE2eTest {
             File(blocked, "blocked").writeText("simulate index write failure")
             ui.onNodeWithText("旋转").performTouchInput { click() }
             ui.waitUntil(60_000) { ui.onAllNodesWithText("文档未保存").fetchSemanticsNodes().isNotEmpty() }
-            assertArrayEquals("失败保存不得推进已提交清单",
-                previousManifest, File(requireNotNull(record.documentManifestPath)).readBytes())
-            assertEquals(record, repository.loadRecords().first { it.id == record.id })
+            assertEquals("索引失败时旋转仍可从可靠清单恢复", 90f,
+                repository.loadDocumentPages(record.id).first().rotationDegrees)
+            assertFalse(previousManifest.contentEquals(File(requireNotNull(record.documentManifestPath)).readBytes()))
+            instrumentation.runOnMainSync { ui.activity.onBackPressedDispatcher.onBackPressed() }
+            ui.onNodeWithText("最近文档").assertExists()
+            ui.onNodeWithText("文档未保存").assertExists()
             evidence("save-failed-original-retained")
             check(blocked.deleteRecursively())
             ownsBlocker = false
@@ -177,7 +184,7 @@ class HistoryRescanE2eTest {
         }
     }
 
-    @Test fun missingTemporaryPagesAreReprocessedOnRetryWithoutLosingOriginal() {
+    @Test fun missingCachesAreRebuiltOnReopenWithoutLosingOriginal() {
         val record = seed()
         val started = System.currentTimeMillis()
         val blocked = File(instrumentation.targetContext.filesDir, "history/records.json.new")
@@ -188,38 +195,54 @@ class HistoryRescanE2eTest {
             val originalIds = repository.loadDocumentPages(record.id).map { it.id }.toSet()
             ui.onNodeWithText("添加").performTouchInput { click() }
             enterCameraWhenReady(ui)
+            ownsBlocker = blocked.mkdir()
+            check(ownsBlocker)
+            File(blocked, "blocked").writeText("simulate failed index commit")
             for (count in 4..5) {
                 ui.onNodeWithContentDescription("拍摄").performClick()
                 ui.waitUntil(30_000) { ui.onAllNodesWithText(count.toString()).fetchSemanticsNodes().isNotEmpty() }
             }
-            ownsBlocker = blocked.mkdir()
-            check(ownsBlocker)
-            File(blocked, "blocked").writeText("simulate failed index commit")
             ui.onNodeWithContentDescription("已拍页面预览").performClick()
             ui.waitUntil(90_000) { ui.onAllNodesWithText("文档未保存").fetchSemanticsNodes().isNotEmpty() }
-            assertEquals(3, repository.loadRecords().first { it.id == record.id }.pageCount)
-            // 已保存文档的页面处理缓存直接落在文档缓存目录（不再经由应用临时目录）。
+            assertEquals(5, repository.loadRecords().first { it.id == record.id }.pageCount)
+            // Only remove this fixture's derived caches; immutable originals stay in place.
             val cachePages = File(File(requireNotNull(record.documentManifestPath)).parentFile, "cache/pages")
+            val addedIds = repository.loadDocumentPages(record.id).map { it.id }.toSet() - originalIds
+            assertEquals(2, addedIds.size)
+            val coordinator = DocumentSaveCoordinator.get(instrumentation.targetContext)
             fun stagedCaches(): List<File> = cachePages.listFiles().orEmpty()
                 .filter { it.isDirectory && it.name !in originalIds }
                 .flatMap { it.listFiles().orEmpty().toList() }
-            ui.waitUntil(90_000) { stagedCaches().isNotEmpty() }
+            ui.waitUntil(90_000) {
+                addedIds.all { id -> File(cachePages, id).listFiles().orEmpty().any { it.extension == "png" && it.length() > 0 } } &&
+                    coordinator.phases.value[record.id].orEmpty().values.none {
+                        it == PageProcessingPhase.PENDING || it == PageProcessingPhase.PROCESSING
+                    }
+            }
+            instrumentation.runOnMainSync { ui.activity.onBackPressedDispatcher.onBackPressed() }
+            ui.onNodeWithText("最近文档").assertExists()
+            ui.waitUntil(30_000) { record.id !in coordinator.documents.value }
             val staged = stagedCaches()
             assertTrue("新增页面必须先落盘处理缓存", staged.isNotEmpty())
             staged.forEach { check(it.delete()) { "无法删除处理缓存：${it.name}" } }
+            assertTrue(addedIds.all { id -> File(cachePages, id).listFiles().orEmpty().none { it.extension == "png" } })
             check(blocked.deleteRecursively())
             ownsBlocker = false
-            ui.onNodeWithText("重试").performClick()
+            // A finishing page may already retry the index and clear the banner. Reopen through
+            // the real history flow to discover missing cache files and enqueue their rebuild.
+            open(record.id)
             ui.waitUntil(90_000) { repository.loadRecords().any { it.id == record.id && it.pageCount == 5 } }
             // 处理缓存丢失后由后台逐页补齐，直到每页都有处理图。
             ui.waitUntil(90_000) {
-                cachePages.listFiles().orEmpty().filter { it.isDirectory }
-                    .all { it.listFiles().orEmpty().any { file -> file.extension == "png" } }
+                (originalIds + addedIds).all { id ->
+                    File(cachePages, id).listFiles().orEmpty().any { it.extension == "png" && it.length() > 0 }
+                }
             }
             ui.waitUntil(30_000) { ui.onAllNodesWithText("正在", substring = true).fetchSemanticsNodes().isEmpty() }
             assertEquals(1, repository.loadRecords().count { it.id == record.id })
             val restored = repository.loadDocumentPages(record.id)
             assertEquals(5, restored.size)
+            assertTrue("原三页 ID 必须保留", restored.map { it.id }.containsAll(originalIds))
             restored.forEach { page ->
                 assertTrue("原图不得丢失", File(requireNotNull(page.sourceImagePath)).isFile)
                 assertNotNull("处理缓存必须重建", page.processedImagePath)

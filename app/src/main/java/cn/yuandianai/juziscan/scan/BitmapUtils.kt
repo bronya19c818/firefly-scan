@@ -98,6 +98,7 @@ fun materializePageRotation(page: ScannedPage): ScannedPage {
             sourceBitmap = rotatedSource,
             reviewBitmap = rotatedReview,
             editableQuad = rotateQuadClockwise(rotatedPage.editableQuad),
+            detectedQuad = rotateQuadClockwise(rotatedPage.detectedQuad),
             processedBitmap = rotatedProcessed,
             previewBitmap = preparePreviewBitmap(rotatedProcessed),
             rotationDegrees = 0f,
@@ -190,6 +191,13 @@ fun loadBitmapFromUri(
 
 /** 按上界从磁盘解码位图；原图只需可靠持久化，重开文档不重复全尺寸驻留内存。 */
 fun decodeBitmapFromFileBounded(path: String, maxSide: Int): Bitmap? {
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+        return ImageDecoder.decodeBitmap(ImageDecoder.createSource(java.io.File(path))) { decoder, info, _ ->
+            val (width, height) = calculateBoundedDimensions(info.size.width, info.size.height, maxSide)
+            decoder.setTargetSize(width, height)
+            decoder.allocator = ImageDecoder.ALLOCATOR_SOFTWARE
+        }
+    }
     val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
     BitmapFactory.decodeFile(path, bounds)
     if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
@@ -201,7 +209,16 @@ fun decodeBitmapFromFileBounded(path: String, maxSide: Int): Bitmap? {
         inSampleSize = sampleSize
         inPreferredConfig = Bitmap.Config.ARGB_8888
     }
-    val decoded = BitmapFactory.decodeFile(path, options) ?: return null
+    val raw = BitmapFactory.decodeFile(path, options) ?: return null
+    val exif = android.media.ExifInterface(path)
+    val rotation = when (exif.getAttributeInt(android.media.ExifInterface.TAG_ORIENTATION, 1)) {
+        android.media.ExifInterface.ORIENTATION_ROTATE_90 -> 90f
+        android.media.ExifInterface.ORIENTATION_ROTATE_180 -> 180f
+        android.media.ExifInterface.ORIENTATION_ROTATE_270 -> 270f
+        else -> 0f
+    }
+    val decoded = SimpleDocumentScanner.rotate(raw, rotation)
+    if (decoded !== raw) raw.recycle()
     val (targetWidth, targetHeight) = calculateBoundedDimensions(decoded.width, decoded.height, maxSide)
     return if (targetWidth == decoded.width && targetHeight == decoded.height) {
         decoded

@@ -27,7 +27,11 @@ import java.util.Locale
 import java.util.UUID
 
 class HistoryRepository(private val context: Context) {
-    companion object { private val storageLock = Any() }
+    companion object {
+        private val storageLock = Any()
+        private val documentLocks = java.util.concurrent.ConcurrentHashMap<String, Any>()
+        private val processingLocks = java.util.concurrent.ConcurrentHashMap<String, Any>()
+    }
     private val rootDir = File(context.filesDir, "history").apply { mkdirs() }
     private val exportDir = File(rootDir, "exports").apply { mkdirs() }
     private val thumbDir = File(rootDir, "thumbs").apply { mkdirs() }
@@ -37,7 +41,7 @@ class HistoryRepository(private val context: Context) {
     private val documentStore = DocumentStore(documentsDir)
     private val timeFormat = SimpleDateFormat("MM-dd HH:mm", Locale.getDefault())
 
-    fun loadRecords(): List<HistoryRecord> = synchronized(storageLock) {
+    private fun loadIndex(): List<HistoryRecord> {
         if (!recordsFile.exists() && !File(recordsFile.path + ".bak").exists()) return emptyList()
         val raw = atomicRecords.openRead().bufferedReader(Charsets.UTF_8).use { it.readText() }
         if (raw.isBlank()) return emptyList()
@@ -50,65 +54,127 @@ class HistoryRepository(private val context: Context) {
         }.sortedByDescending { it.updatedAtMillis }
     }
 
-    /**
-     * 增量保存：只写入新增或真正变化的页面资产，清单原子提交；
-     * 不再生成 PDF，也不复制整份文档。页面尚未完成处理不妨碍原始数据保存。
-     */
-    fun saveDocumentRecord(pages: List<ScannedPage>, recordId: String? = null): HistoryRecord = synchronized(storageLock) {
-        require(pages.isNotEmpty()) { "No pages to save." }
-        val previous = recordId?.let { id -> loadRecords().firstOrNull { it.id == id }
-            ?: error("原文档不存在") }
-        require(previous == null || previous.kind == HistoryRecordKind.Document)
-        val fingerprint = documentFingerprint(pages)
-        if (previous?.documentFingerprint == fingerprint) return previous
-        val now = maxOf(System.currentTimeMillis(), (previous?.updatedAtMillis ?: 0L) + 1)
-        val id = previous?.id ?: UUID.randomUUID().toString()
-        val documentDir = File(documentsDir, id)
-        // 索引是文档记录的提交点，清单是文档内容的提交点：后者先落盘，前者失败时必须回滚后者。
-        val rollbackManifest = previous?.documentManifestPath
-            ?.let { runCatching { File(it).readBytes() }.getOrNull() }
-        var committed = false
-        try {
-            check(documentDir.exists() || documentDir.mkdirs()) { "无法创建文档目录" }
-            documentStore.save(documentDir, pages)
-            val record = HistoryRecord(
-                id = id,
-                kind = HistoryRecordKind.Document,
+    fun loadRecords(): List<HistoryRecord> = synchronized(storageLock) {
+        val records = loadIndex().associateBy { it.id }.toMutableMap()
+        documentsDir.listFiles()?.filter { it.isDirectory && !isDocumentDeleted(it.name) }?.forEach { directory ->
+            documentStore.readManifestOrNull(directory)?.takeIf { it.recordId == directory.name }?.let {
+                records[directory.name] = recordFromManifest(directory.name, it)
+            }
+        }
+        records.values.filterNot { isDocumentDeleted(it.id) }.sortedByDescending { it.updatedAtMillis }
+    }
+
+    fun saveDocumentRecord(pages: List<ScannedPage>, recordId: String? = null): HistoryRecord {
+        val record = commitDocument(pages, recordId ?: UUID.randomUUID().toString(), reliableOnly = false)
+        mergeDocumentIndex(record.id)
+        return record
+    }
+
+    /** Atomic per-document commit; encoding never holds the shared history-index lock. */
+    fun commitDocument(pages: List<ScannedPage>, id: String, reliableOnly: Boolean = true,
+                       expectedVersion: Long? = null): HistoryRecord =
+        synchronized(documentLocks.getOrPut(id) { Any() }) {
+            require(id.matches(Regex("[a-zA-Z0-9-]+"))) { "无效文档 ID" }
+            check(!isDocumentDeleted(id)) { "文档已删除" }
+            require(pages.isNotEmpty()) { "没有可保存的页面" }
+            val dir = File(documentsDir, id)
+            val old = documentStore.readManifestOrNull(dir)
+            val previous = if (old?.recordId == id) recordFromManifest(id, old)
+                else synchronized(storageLock) { loadIndex().firstOrNull { it.id == id } }
+            if (expectedVersion != null && expectedVersion != (previous?.updatedAtMillis ?: 0L)) {
+                throw java.util.ConcurrentModificationException("文档已更新，请重新操作")
+            }
+            require(previous == null || previous.kind == HistoryRecordKind.Document)
+            val fingerprint = documentFingerprint(pages)
+            if (previous?.documentFingerprint == fingerprint) return@synchronized previous
+            val now = maxOf(System.currentTimeMillis(), (previous?.updatedAtMillis ?: 0L) + 1)
+            val metadata = DocumentManifest(pages = emptyList(), coverSignature = "", recordId = id,
+                createdAtMillis = previous?.createdAtMillis ?: now, updatedAtMillis = now,
                 title = previous?.title ?: "文件扫描 ${timeFormat.format(Date(now))}",
-                subtitle = "${pages.size} 页 PDF 文档",
-                createdAtMillis = previous?.createdAtMillis ?: now,
-                pageCount = pages.size,
                 fileName = previous?.fileName ?: "桔子扫描_文件扫描_${timestampToken(now)}.pdf",
-                filePath = documentStore.pdfCacheFile(documentDir).absolutePath,
-                mimeType = "application/pdf",
-                thumbnailPath = File(documentDir, "thumbnail.jpg").absolutePath,
-                updatedAtMillis = now,
-                documentManifestPath = File(documentDir, "document.json").absolutePath,
-                documentFingerprint = fingerprint
-            )
-            runCatching { upsert(record) }.onFailure { error ->
-                // 索引提交失败：回滚已提交的清单，否则文档内容会领先于索引，用户会看到「未保存」但内容已变。
-                rollbackManifest?.let { bytes ->
-                    runCatching { documentStore.restoreManifest(documentDir, bytes) }
-                        .onFailure { rollback -> Log.w("JuZiScan", "Could not roll back document manifest", rollback) }
-                }
-                throw error
-            }
-            committed = true
-            return record
-        } finally {
-            // 新建文档保存失败可整体回退；已有文档依赖旧清单继续指向旧资产。
-            if (!committed && previous == null) {
-                runCatching { documentDir.deleteRecursively() }
-            }
+                fingerprint = fingerprint, version = (old?.version ?: 0L) + 1)
+            val manifest = documentStore.save(dir, pages.toList(), metadata, reliableOnly)
+            recordFromManifest(id, manifest)
+        }
+
+    fun captureFile(id: String, pageId: String, revision: String): File {
+        require(listOf(id, pageId, revision).all { it.matches(Regex("[a-zA-Z0-9-]+")) })
+        check(!isDocumentDeleted(id)) { "文档已删除" }
+        val dir = File(rootDir, "captures/$id").apply { check(isDirectory || mkdirs()) { "无法保存原图，请检查存储空间" } }
+        return File(dir, "$pageId-$revision.jpg")
+    }
+
+    fun documentRecord(id: String): HistoryRecord? {
+        if (isDocumentDeleted(id)) return null
+        val manifest = documentStore.readManifestOrNull(File(documentsDir, id))
+        return if (manifest?.recordId == id) recordFromManifest(id, manifest)
+            else synchronized(storageLock) { loadIndex().firstOrNull { it.id == id } }
+    }
+
+    fun mergeDocumentIndex(id: String) = synchronized(storageLock) {
+        if (!isDocumentDeleted(id)) {
+            val manifest = documentStore.readManifestOrNull(File(documentsDir, id)) ?: return@synchronized
+            if (manifest.recordId == null) return@synchronized
+            val record = recordFromManifest(id, manifest)
+            if (loadIndex().firstOrNull { it.id == id } != record) upsert(record)
         }
     }
 
-    fun loadDocumentPages(recordId: String): List<ScannedPage> = synchronized(storageLock) {
+    fun maintainDocumentCaches(id: String) = synchronized(documentLocks.getOrPut(id) { Any() }) {
+        if (!isDocumentDeleted(id)) documentStore.maintainCaches(File(documentsDir, id))
+    }
+
+    fun isDocumentDeleted(id: String): Boolean = File(rootDir, "deleted/$id").isFile
+
+    private fun recordFromManifest(id: String, manifest: DocumentManifest): HistoryRecord {
+        val dir = File(documentsDir, id)
+        return HistoryRecord(id = id, kind = HistoryRecordKind.Document, title = requireNotNull(manifest.title),
+            subtitle = "${manifest.pages.size} 页扫描文档", createdAtMillis = manifest.createdAtMillis,
+            updatedAtMillis = manifest.updatedAtMillis, pageCount = manifest.pages.size,
+            fileName = requireNotNull(manifest.fileName), filePath = documentStore.pdfCacheFile(dir).path,
+            mimeType = "application/pdf", thumbnailPath = File(dir, "thumbnail.jpg").path,
+            documentManifestPath = File(dir, "document.json").path, documentFingerprint = manifest.fingerprint)
+    }
+
+    fun loadDocumentPages(recordId: String): List<ScannedPage> {
         val record = loadRecords().firstOrNull { it.id == recordId && it.kind == HistoryRecordKind.Document }
             ?: error("文档不存在")
-        documentStore.loadPages(requireNotNull(record.documentManifestPath) { "文档页面数据不存在" })
+        return documentStore.loadPages(requireNotNull(record.documentManifestPath) { "文档页面数据不存在" })
     }
+
+    fun processCachedPage(id: String, page: ScannedPage,
+                          onIntermediate: ((ScannedPage) -> Unit)? = null): ScannedPage =
+        synchronized(processingLocks.getOrPut(id) { Any() }) {
+            if (isDocumentDeleted(id)) throw cn.yuandianai.juziscan.scan.ObsoletePageResultException()
+            val target = requireNotNull(processedCacheFileFor(id, page)) { "文档不存在" }
+            if (target.isFile && target.length() > 0) return@synchronized page.copy(processedImagePath = target.path,
+                previewBitmap = cn.yuandianai.juziscan.scan.decodeBitmapFromFileBounded(target.path, 640),
+                detectedQuad = cn.yuandianai.juziscan.scan.readDetectedQuad(target))
+            val staged = cn.yuandianai.juziscan.scan.createTempProcessedFile(context)
+            val stagedPreview = File(staged.parentFile, staged.nameWithoutExtension + ".jpg")
+            val stagedQuad = File(staged.path + ".quad")
+            try {
+                val result = processDocumentPage(context, page, staged, onIntermediate)
+                synchronized(documentLocks.getOrPut(id) { Any() }) {
+                    if (isDocumentDeleted(id)) throw cn.yuandianai.juziscan.scan.ObsoletePageResultException()
+                    val manifest = documentStore.readManifestOrNull(File(documentsDir, id))
+                    val current = manifest?.findPage(page.id)
+                    val expected = computePageCacheKey(page.contentRevision, page.correctionMode.name,
+                        page.imageStyle, page.editableQuad.map { QuadPoint(it.x, it.y) })
+                    if (manifest != null && (current == null || current.contentRevision != page.contentRevision ||
+                            current.cacheKey != expected)) throw cn.yuandianai.juziscan.scan.ObsoletePageResultException()
+                    check(current != null || documentRecord(id) != null) { "文档不存在" }
+                    check(target.parentFile!!.isDirectory || target.parentFile!!.mkdirs()) { "无法创建页面缓存目录" }
+                    if (stagedPreview.isFile) check(stagedPreview.renameTo(File(target.parentFile, target.nameWithoutExtension + ".jpg")))
+                    if (stagedQuad.isFile) check(stagedQuad.renameTo(File(target.path + ".quad")))
+                    // Publish the PNG last: its presence marks a completed cache write.
+                    check(staged.renameTo(target)) { "页面缓存提交失败" }
+                    result.copy(processedImagePath = target.path)
+                }
+            } finally {
+                listOf(staged, stagedPreview, stagedQuad, File(stagedQuad.path + ".new")).forEach { it.delete() }
+            }
+        }
 
     /** 已保存文档某页的处理缓存目标（后台逐页处理直接写入文档缓存）。 */
     fun processedCacheFileFor(recordId: String, page: ScannedPage): File? {
@@ -121,10 +187,13 @@ class HistoryRepository(private val context: Context) {
         val documentDir = File(documentsDir, recordId)
         val sourcePath = documentStore.pageSourcePathFor(documentDir, page)
         // 只绑定真正可取用的处理图：缓存被清理过的页面退回待处理，由后台队列补齐。
-        val processedPath = if (page.hasProcessedOutput) {
-            documentStore.processedCacheFileFor(documentDir, page).path
-        } else null
+        val processedPath = documentStore.processedCacheFileFor(documentDir, page)
+            .takeIf { it.isFile && it.length() > 0 }?.path
         return sourcePath to processedPath
+    }
+
+    fun prepareDocumentPages(id: String): List<ScannedPage> {
+        return loadDocumentPages(id).map { page -> if (page.hasProcessedOutput) page else processCachedPage(id, page) }
     }
 
     /**
@@ -133,11 +202,12 @@ class HistoryRepository(private val context: Context) {
      * - 缺失或失效 → 补齐未处理页面后重新生成并替换缓存。
      * 文档自动保存不再触发本方法，仅分享 / 打开 / 导出等明确需要 PDF 时调用。
      */
-    fun ensureDocumentPdf(recordId: String): File = synchronized(storageLock) {
+    fun ensureDocumentPdf(recordId: String): File = synchronized(processingLocks.getOrPut(recordId) { Any() }) {
         val record = loadRecords().firstOrNull { it.id == recordId && it.kind == HistoryRecordKind.Document }
             ?: error("文档不存在")
         val manifestPath = requireNotNull(record.documentManifestPath) { "文档页面数据不存在" }
         val documentDir = File(documentsDir, record.id)
+        try {
         val pdfFile = documentStore.pdfCacheFile(documentDir)
         val metaFile = documentStore.pdfMetaFile(pdfFile)
         val fingerprint = record.documentFingerprint
@@ -160,18 +230,15 @@ class HistoryRepository(private val context: Context) {
                     File(page.processedImagePath!!).copyTo(target, overwrite = true)
                     page.copy(processedImagePath = target.path)
                 }
-                else -> processDocumentPage(context, page, target)
+                else -> processCachedPage(recordId, page)
             }
         }
         // 后台补处理可能完善了四角，收敛清单与缓存键（失败不阻断 PDF 生成）。
-        val refreshedManifestPath = runCatching { documentStore.refreshManifest(documentDir, processedPages) }
-            .onFailure { Log.w("JuZiScan", "Could not refresh manifest during PDF export", it) }
-            .getOrNull()
-        writePdfCacheFile(pdfFile, processedPages, fingerprint)
-        if (refreshedManifestPath != null && refreshedManifestPath != record.documentManifestPath) {
-            upsert(record.copy(documentManifestPath = refreshedManifestPath))
-        }
+        writePdfCacheFile(recordId, pdfFile, processedPages, fingerprint)
         return pdfFile
+        } finally {
+            if (isDocumentDeleted(recordId)) File(documentsDir, recordId).deleteRecursively()
+        }
     }
 
     fun saveIdCardRecord(
@@ -240,16 +307,25 @@ class HistoryRepository(private val context: Context) {
         return record
     }
 
-    fun deleteRecord(recordId: String) = synchronized(storageLock) {
-        val records = loadRecords().toMutableList()
-        val target = records.firstOrNull { it.id == recordId } ?: return
-        records.removeAll { it.id == recordId }
-        persist(records)
-        File(target.filePath).delete()
-        target.thumbnailPath?.let { File(it).delete() }
-        if (target.kind == HistoryRecordKind.Document) {
-            File(documentsDir, target.id).deleteRecursively()
+    fun deleteRecord(recordId: String) = synchronized(documentLocks.getOrPut(recordId) { Any() }) {
+        require(recordId.matches(Regex("[a-zA-Z0-9-]+")))
+        synchronized(storageLock) {
+            val records = loadRecords().toMutableList()
+            val target = records.firstOrNull { it.id == recordId }
+            val marker = File(rootDir, "deleted/$recordId")
+            check(marker.parentFile!!.isDirectory || marker.parentFile!!.mkdirs())
+            val atomic = AtomicFile(marker)
+            val stream = atomic.startWrite()
+            try {
+                stream.write("deleted".toByteArray()); stream.fd.sync(); atomic.finishWrite(stream)
+                check(!File(marker.path + ".new").exists()) { "删除未完成" }
+            } catch (error: Throwable) { atomic.failWrite(stream); throw error }
+            records.removeAll { it.id == recordId }
+            persist(records)
+            target?.let { File(it.filePath).delete(); it.thumbnailPath?.let { path -> File(path).delete() } }
         }
+        File(documentsDir, recordId).deleteRecursively()
+        File(rootDir, "captures/$recordId").deleteRecursively()
         Unit
     }
 
@@ -309,26 +385,32 @@ class HistoryRepository(private val context: Context) {
         return displayName to uri
     }
 
-    private fun writePdfCacheFile(pdfFile: File, pages: List<ScannedPage>, fingerprint: String?) {
-        val cacheDir = pdfFile.parentFile
-        check(cacheDir != null && (cacheDir.isDirectory || cacheDir.mkdirs())) { "无法创建 PDF 缓存目录" }
-        val tmp = File(cacheDir, pdfFile.name + ".tmp")
-        FileOutputStream(tmp).use { output ->
-            writePdfToStream(output, pages, ExportFileSize.Actual)
-            output.flush()
-            output.fd.sync()
-        }
-        if (pdfFile.exists() && !pdfFile.delete()) {
-            tmp.delete()
-            throw IllegalStateException("PDF 缓存替换失败")
-        }
-        check(tmp.renameTo(pdfFile)) { "PDF 缓存写入失败" }
-        val metaFile = documentStore.pdfMetaFile(pdfFile)
-        FileOutputStream(metaFile).use { output ->
-            output.write((fingerprint ?: "").toByteArray(Charsets.UTF_8))
-            output.flush()
-            output.fd.sync()
-        }
+    private fun writePdfCacheFile(id: String, pdfFile: File, pages: List<ScannedPage>, fingerprint: String?) {
+        // Encode outside document storage: deleting a document must not be undone by a late export.
+        val tmp = File.createTempFile("document-export-", ".pdf", context.cacheDir)
+        try {
+            FileOutputStream(tmp).use { output ->
+                writePdfToStream(output, pages, ExportFileSize.Actual)
+                output.flush()
+                output.fd.sync()
+            }
+            synchronized(documentLocks.getOrPut(id) { Any() }) {
+                check(!isDocumentDeleted(id)) { "文档已删除" }
+                check(loadRecords().firstOrNull { it.id == id }?.documentFingerprint == fingerprint) {
+                    "文档已更新，请重新导出"
+                }
+                val cacheDir = requireNotNull(pdfFile.parentFile)
+                check(cacheDir.isDirectory || cacheDir.mkdirs()) { "无法创建 PDF 缓存目录" }
+                check(tmp.renameTo(pdfFile)) { "PDF 缓存写入失败" }
+                val atomic = AtomicFile(documentStore.pdfMetaFile(pdfFile))
+                val stream = atomic.startWrite()
+                try {
+                    stream.write((fingerprint ?: "").toByteArray(Charsets.UTF_8))
+                    stream.fd.sync()
+                    atomic.finishWrite(stream)
+                } catch (error: Throwable) { atomic.failWrite(stream); throw error }
+            }
+        } finally { tmp.delete() }
     }
 
     fun decodeThumbnail(record: HistoryRecord): Bitmap? {

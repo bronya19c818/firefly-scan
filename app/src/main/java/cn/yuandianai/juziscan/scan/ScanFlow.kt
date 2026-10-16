@@ -13,6 +13,7 @@ import android.net.Uri
 import android.provider.Settings
 import android.util.Log
 import android.widget.Toast
+import java.io.File
 import cn.yuandianai.juziscan.BuildConfig
 import cn.yuandianai.juziscan.auth.AuthSessionStore
 import cn.yuandianai.juziscan.payment.JuZiScanBackendClient
@@ -57,7 +58,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.snapshotFlow
+import androidx.compose.runtime.collectAsState
 import androidx.activity.compose.BackHandler
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -80,6 +81,8 @@ import androidx.lifecycle.LifecycleEventObserver
 import cn.yuandianai.juziscan.history.HistoryRecord
 import cn.yuandianai.juziscan.history.HistoryRepository
 import cn.yuandianai.juziscan.history.HistoryRecordKind
+import cn.yuandianai.juziscan.history.DocumentSaveCoordinator
+import cn.yuandianai.juziscan.history.SavedDocumentState
 import cn.yuandianai.juziscan.scan.ui.ActionPillButton
 import cn.yuandianai.juziscan.scan.ui.AllToolsScreen
 import cn.yuandianai.juziscan.scan.ui.AuthDialog
@@ -110,12 +113,9 @@ import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.flow.filterNotNull
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import kotlinx.coroutines.withTimeoutOrNull
 
 @Composable
 fun ScanFlow() {
@@ -363,6 +363,7 @@ private fun ScannerFlowScreen(
     val analysisExecutor = remember { Executors.newSingleThreadExecutor() }
     val captureExecutor = remember { Executors.newSingleThreadExecutor() }
     val scope = rememberCoroutineScope()
+    val screenActive = remember { AtomicBoolean(true) }
     val vm = remember { ScanViewModel() }
     var cameraResumed by remember(lifecycleOwner) {
         mutableStateOf(lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED))
@@ -375,6 +376,12 @@ private fun ScannerFlowScreen(
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
     val historyRepository = remember(context) { HistoryRepository(context.applicationContext) }
+    val documentSaver = remember(context) { DocumentSaveCoordinator.get(context) }
+    val savedDocuments by documentSaver.documents.collectAsState()
+    val savedPhases by documentSaver.phases.collectAsState()
+    val saveFailures by documentSaver.failures.collectAsState()
+    val documentChanges by documentSaver.changes.collectAsState()
+    val historyReadVersion = remember { java.util.concurrent.atomic.AtomicLong(0) }
     val authSessionStore = remember(context) { AuthSessionStore(context.applicationContext) }
     val settingsPrefs = remember(context) {
         context.getSharedPreferences("app_settings", android.content.Context.MODE_PRIVATE)
@@ -451,54 +458,6 @@ private fun ScannerFlowScreen(
         }
     }
 
-    // 逐页后台处理队列：有限并发、当前页优先、任务与页面内容版本绑定。
-    val processingQueue = remember(vm, historyRepository) {
-        PageProcessingQueue(
-            scope = scope,
-            pageProvider = { pageId -> vm.pages.firstOrNull { it.id == pageId } },
-            processPage = { page ->
-                val output = vm.currentDocumentRecordId?.let { recordId ->
-                    runCatching { historyRepository.processedCacheFileFor(recordId, page) }.getOrNull()
-                }
-                processDocumentPage(context, page, output) { intermediate ->
-                    // 渐进预览：矫正结果先上屏，随后由最终增强结果替换；
-                    // 页面在此期间被替换 / 删除或已就绪时，中间结果直接丢弃。
-                    scope.launch {
-                        val index = vm.pages.indexOfFirst { it.id == intermediate.id }
-                        if (index < 0) return@launch
-                        val current = vm.pages[index]
-                        if (current.contentRevision != intermediate.contentRevision ||
-                            current.hasProcessedOutput
-                        ) {
-                            return@launch
-                        }
-                        vm.pages = vm.pages.toMutableList().also {
-                            it[index] = current.copy(previewBitmap = intermediate.previewBitmap)
-                        }
-                    }
-                }
-            },
-            onPageProcessed = { processed ->
-                val index = vm.pages.indexOfFirst { it.id == processed.id }
-                if (index >= 0) {
-                    val current = vm.pages[index]
-                    // 只采用与当前页面状态匹配的结果：内容版本变化或已就绪的页面直接丢弃旧结果。
-                    if (shouldApplyProcessedPage(current.contentRevision, current.hasProcessedOutput,
-                            processed.contentRevision)
-                    ) {
-                        vm.pages = vm.pages.toMutableList().also { it[index] = processed }
-                    }
-                }
-            },
-            onPhaseChanged = { pageId, phase ->
-                vm.pagePhases = when (phase) {
-                    null -> vm.pagePhases - pageId
-                    else -> vm.pagePhases + (pageId to phase)
-                }
-            }
-        )
-    }
-
     with(vm) {
         val currentSession = authSessionStore.session
 
@@ -511,18 +470,20 @@ private fun ScannerFlowScreen(
 
         /** 提交所有尚未处理的页面，由后台队列按优先级逐页处理。 */
         fun submitPendingPages() {
-            pages.filter { !it.hasProcessedOutput }.forEach { processingQueue.submit(it.id) }
+            currentDocumentRecordId?.let { id -> documentSaver.attach(id, SavedDocumentState(documentVersion, pages)) }
         }
 
         /** 用户切换页面时提升该页的处理优先级。 */
         fun promoteActivePage() {
-            pages.getOrNull(activeIndex)?.let { processingQueue.promote(it.id) }
+            currentDocumentRecordId?.let { id -> pages.getOrNull(activeIndex)?.let { documentSaver.promote(id, it.id) } }
         }
 
         fun refreshHistoryRecords() {
+            val requestVersion = historyReadVersion.incrementAndGet()
             scope.launch {
                 try {
-                    historyRecords = withContext(Dispatchers.IO) { historyRepository.loadRecords() }
+                    val loaded = withContext(Dispatchers.IO) { historyRepository.loadRecords() }
+                    if (historyReadVersion.get() == requestVersion) historyRecords = loaded
                 } catch (error: Exception) {
                     if (error is CancellationException) throw error
                     Log.e("JuZiScan", "Load history failed", error)
@@ -531,7 +492,18 @@ private fun ScannerFlowScreen(
             }
         }
 
-        LaunchedEffect(historyRepository) { refreshHistoryRecords() }
+        LaunchedEffect(documentChanges) { refreshHistoryRecords() }
+        LaunchedEffect(currentDocumentRecordId, savedDocuments[currentDocumentRecordId], savedPhases[currentDocumentRecordId], stage) {
+            val id = currentDocumentRecordId
+            val saved = savedDocuments[id]
+            if (saved != null && saved.updatedAtMillis >= documentVersion &&
+                stage in listOf(ScanStage.Preview, ScanStage.Capture)) {
+                pages = saved.pages
+                documentVersion = saved.updatedAtMillis
+                activeIndex = activeIndex.coerceIn(0, (pages.size - 1).coerceAtLeast(0))
+            }
+            pagePhases = savedPhases[id].orEmpty()
+        }
 
         fun refreshMembershipStatus() {
             if (currentSession == null) {
@@ -660,7 +632,8 @@ private fun ScannerFlowScreen(
                         startEntry(ScanEntry.Document, openCapture = false)
                         pages = restored
                         currentDocumentRecordId = record.id
-                        savedDocumentFingerprint = documentFingerprint(restored)
+                        documentVersion = record.updatedAtMillis
+                        documentSaver.attach(record.id, SavedDocumentState(record.updatedAtMillis, restored))
                         documentReturnStage = origin
                         openedFromHistory = true
                         activeIndex = 0
@@ -714,13 +687,16 @@ private fun ScannerFlowScreen(
         }
 
         fun openEdgeReviewForPage(index: Int) {
-            if (isProcessingPreview || isSavingDocument) return
+            if (isProcessingPreview) return
             val currentIndex = index.coerceIn(0, pages.lastIndex)
             val page = pages.getOrNull(currentIndex) ?: return
+            val owner = currentDocumentRecordId
+            val session = documentUiSession
+            editingDocumentPage = page
             val showEditor: (ScannedPage) -> Unit = { editingPage ->
                 sourceBitmap = editingPage.sourceBitmap
                 reviewBitmap = editingPage.reviewBitmap
-                editableQuad = editingPage.editableQuad
+                editableQuad = editingPage.editableQuad.ifEmpty { editingPage.detectedQuad }.ifEmpty { defaultDocumentQuad() }
                 correctionMode = editingPage.correctionMode
                 replacingIndex = currentIndex
                 currentTask = CaptureTask.Document
@@ -731,10 +707,17 @@ private fun ScannerFlowScreen(
             scope.launch {
                 runCatching {
                     withContext(Dispatchers.Default) {
-                        materializePageRotation(hydratePageForEditing(page))
+                        val hydrated = hydratePageForEditing(page)
+                        val prepared = if (hydrated.editableQuad.isEmpty() && hydrated.detectedQuad.isEmpty()) {
+                            hydrated.copy(detectedQuad = SimpleDocumentScanner.detectDocumentQuad(context,
+                                hydrated.reviewBitmap ?: hydrated.sourceBitmap).orEmpty())
+                        } else hydrated
+                        materializePageRotation(prepared)
                     }
                 }.onSuccess { materializedPage ->
-                    showEditor(materializedPage)
+                    if (currentDocumentRecordId == owner && documentUiSession == session && stage == ScanStage.Preview) {
+                        showEditor(materializedPage)
+                    }
                 }.onFailure { error ->
                     Log.e("JuZiScan", "Prepare page for editing failed", error)
                     Toast.makeText(
@@ -743,13 +726,17 @@ private fun ScannerFlowScreen(
                         Toast.LENGTH_LONG
                     ).show()
                 }
-                isProcessingPreview = false
-                processingMessage = "正在处理…"
+                if (currentDocumentRecordId == owner && documentUiSession == session) {
+                    isProcessingPreview = false
+                    processingMessage = "正在处理…"
+                }
             }
         }
 
         DisposableEffect(Unit) {
             onDispose {
+                screenActive.set(false)
+                documentSaver.detach(currentDocumentRecordId)
                 analysisExecutor.shutdown()
                 captureExecutor.shutdown()
             }
@@ -806,27 +793,31 @@ private fun ScannerFlowScreen(
             }
         }
 
-        fun handleDocumentCapture(bitmap: Bitmap, preview: Bitmap) {
-            val newPage = ScannedPage(
-                id = replacingIndex?.let { pages.getOrNull(it)?.id } ?: java.util.UUID.randomUUID().toString(),
-                sourceBitmap = bitmap,
-                previewBitmap = preview
-            )
-            val replacement = replacingIndex
-            val updatedPages = if (replacement != null && replacement in pages.indices) {
-                pages.mapIndexed { index, page -> if (index == replacement) newPage else page }
-            } else pages + newPage
-            pages = updatedPages
-            activeIndex = replacement?.coerceIn(0, updatedPages.lastIndex) ?: updatedPages.lastIndex
-            replacingIndex = null
-            autoCaptureUiState = AutoCaptureUiState(
-                hintText = "已拍摄 ${updatedPages.size} 页，请放入下一页",
-                stableProgress = 0f,
-                documentDetected = false
-            )
-            Toast.makeText(context, "已拍摄 ${updatedPages.size} 页", Toast.LENGTH_SHORT).show()
-            // 快门不受后台处理影响：新页立即入列，处理与下一次拍摄重叠进行。
-            processingQueue.submit(newPage.id)
+        fun refreshDocumentStateIfNeeded(): Boolean {
+            val saved = documentSaver.documents.value[currentDocumentRecordId] ?: return false
+            if (saved.updatedAtMillis <= documentVersion) return false
+            pages = saved.pages
+            documentVersion = saved.updatedAtMillis
+            activeIndex = activeIndex.coerceIn(0, pages.lastIndex)
+            return true
+        }
+
+        fun commitPageEdits(updated: List<ScannedPage>): Boolean {
+            val id = ensureDocumentId()
+            if (refreshDocumentStateIfNeeded()) return false
+            if (documentSaver.hasPendingChanges(id)) {
+                Toast.makeText(context, "请先重试未保存的修改", Toast.LENGTH_SHORT).show()
+                return false
+            }
+            return try {
+                val record = documentSaver.commit(id, updated, documentVersion)
+                documentVersion = record.updatedAtMillis
+                pages = updated
+                true
+            } catch (error: Exception) {
+                Toast.makeText(context, "修改未保存，请检查存储空间后重试", Toast.LENGTH_LONG).show()
+                false
+            }
         }
 
         fun idCardCaptureTargetCount(): Int = selectedIdCardLayout.captureCount
@@ -1038,9 +1029,68 @@ private fun ScannerFlowScreen(
 
         fun triggerCapture() {
             val capture = imageCapture ?: return
+            if (currentTask == CaptureTask.Document) refreshDocumentStateIfNeeded()
+            if (currentTask == CaptureTask.Document && documentSaver.hasPendingChanges(currentDocumentRecordId)) {
+                Toast.makeText(context, "请先重试未保存的照片", Toast.LENGTH_SHORT).show()
+                return
+            }
             if (!lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) return
             if (!tryBeginCapture()) return
             val taskAtCapture = currentTask
+            if (taskAtCapture == CaptureTask.Document) {
+                val documentId = ensureDocumentId()
+                val capturedPages = pages.toList()
+                val replacement = replacingIndex
+                val pageId = replacement?.let { capturedPages.getOrNull(it)?.id } ?: java.util.UUID.randomUUID().toString()
+                val revision = java.util.UUID.randomUUID().toString()
+                try {
+                    val file = historyRepository.captureFile(documentId, pageId, revision)
+                    capture.takePicture(ImageCapture.OutputFileOptions.Builder(file).build(), captureExecutor,
+                        object : ImageCapture.OnImageSavedCallback {
+                            override fun onImageSaved(output: ImageCapture.OutputFileResults) {
+                                try {
+                                    java.io.FileOutputStream(file, true).use { it.fd.sync() }
+                                    check(file.length() > 0) { "原图保存失败" }
+                                    val thumbnail = requireNotNull(decodeBitmapFromFileBounded(file.path, 640))
+                                    val page = ScannedPage(id = pageId, contentRevision = revision,
+                                        sourceBitmap = thumbnail, previewBitmap = thumbnail, sourceImagePath = file.path)
+                                    val saved = documentSaver.addPages(documentId, listOf(page),
+                                        replacement?.let { capturedPages.getOrNull(it)?.id })
+                                    val persisted = saved.pages
+                                    mainExecutor.execute {
+                                        if (screenActive.get() && currentDocumentRecordId == documentId && stage == ScanStage.Capture) {
+                                            pages = persisted
+                                            documentVersion = saved.updatedAtMillis
+                                            documentSaver.attach(documentId, saved)
+                                            activeIndex = replacement?.coerceIn(0, persisted.lastIndex) ?: persisted.lastIndex
+                                            replacingIndex = null
+                                            isCapturing = false
+                                            autoCaptureUiState = AutoCaptureUiState(hintText = "已拍摄 ${persisted.size} 页，请放入下一页")
+                                            Toast.makeText(context, "已拍摄 ${persisted.size} 页", Toast.LENGTH_SHORT).show()
+                                        }
+                                    }
+                                } catch (error: Exception) {
+                                    documentSaver.reportFailure(documentId, error)
+                                    mainExecutor.execute {
+                                        if (currentDocumentRecordId == documentId) isCapturing = false
+                                        Toast.makeText(context, "照片未保存，请检查存储空间后重试", Toast.LENGTH_LONG).show()
+                                    }
+                                }
+                            }
+                            override fun onError(exception: ImageCaptureException) {
+                                documentSaver.reportFailure(documentId, exception)
+                                mainExecutor.execute {
+                                    if (currentDocumentRecordId == documentId) isCapturing = false
+                                    Toast.makeText(context, "照片未保存，请重试", Toast.LENGTH_LONG).show()
+                                }
+                            }
+                        })
+                } catch (error: Exception) {
+                    isCapturing = false
+                    documentSaver.reportFailure(documentId, error)
+                }
+                return
+            }
             try {
                 capture.takePicture(
                     captureExecutor,
@@ -1073,8 +1123,7 @@ private fun ScannerFlowScreen(
                                         if (!rotated.isRecycled) rotated.recycle()
                                     } else if (taskAtCapture.entry == ScanEntry.IdCard) {
                                         handleIdCardCapture(rotated)
-                                    } else if (taskAtCapture == CaptureTask.Document) {
-                                        handleDocumentCapture(rotated, requireNotNull(thumbnail))
+
                                     } else {
                                         pushBitmapToEdgeReview(rotated)
                                     }
@@ -1118,13 +1167,18 @@ private fun ScannerFlowScreen(
             contract = ActivityResultContracts.PickMultipleVisualMedia()
         ) { uris ->
             if (uris.isEmpty()) return@rememberLauncherForActivityResult
+            val taskAtImport = currentTask
+            val importId = if (taskAtImport == CaptureTask.Document) ensureDocumentId() else null
+            val importSession = documentUiSession
+            val existingPages = pages.toList()
+            val replacementAtImport = replacingIndex
             isCapturing = true
             scope.launch {
                 runCatching {
                     withContext(Dispatchers.IO) {
                         uris.mapNotNull { uri ->
                             loadBitmapFromUri(context, uri,
-                                if (currentTask == CaptureTask.Document) DOCUMENT_INPUT_MAX_SIDE else SCAN_INPUT_MAX_SIDE)
+                                if (taskAtImport == CaptureTask.Document) DOCUMENT_INPUT_MAX_SIDE else SCAN_INPUT_MAX_SIDE)
                                 ?.let { bitmap -> uri to bitmap }
                         }
                     }
@@ -1132,6 +1186,35 @@ private fun ScannerFlowScreen(
                     if (results.isEmpty()) {
                         isCapturing = false
                         Toast.makeText(context, "选图失败，请重试", Toast.LENGTH_SHORT).show()
+                        return@onSuccess
+                    }
+
+                    if (taskAtImport == CaptureTask.Document) {
+                        val id = requireNotNull(importId)
+                        val replacement = replacementAtImport
+                        val incoming = results.mapIndexed { index, (_, bitmap) -> ScannedPage(
+                            id = if (index == 0) replacement?.let { existingPages.getOrNull(it)?.id }
+                                ?: java.util.UUID.randomUUID().toString() else java.util.UUID.randomUUID().toString(),
+                            sourceBitmap = bitmap, previewBitmap = preparePreviewBitmap(bitmap, 640)) }
+                        scope.launch {
+                            try {
+                                val restored = withContext(NonCancellable + Dispatchers.IO) {
+                                    documentSaver.addPages(id, incoming, replacement?.let { existingPages.getOrNull(it)?.id })
+                                }
+                                if (screenActive.get() && currentDocumentRecordId == id && documentUiSession == importSession) {
+                                    pages = restored.pages
+                                    documentVersion = restored.updatedAtMillis
+                                    documentSaver.attach(id, restored)
+                                    isCapturing = false
+                                    replacingIndex = null
+                                    openPreviewAt(restored.pages.lastIndex)
+                                }
+                            } catch (error: Exception) {
+                                if (error is CancellationException) throw error
+                                if (currentDocumentRecordId == id && documentUiSession == importSession) isCapturing = false
+                                Toast.makeText(context, "图片未保存，请检查存储空间后重试", Toast.LENGTH_LONG).show()
+                            }
+                        }
                         return@onSuccess
                     }
 
@@ -1161,6 +1244,8 @@ private fun ScannerFlowScreen(
                         openPreviewAt(activeIndex)
                     }
                 }.onFailure { error ->
+                    if (error is CancellationException) throw error
+                    if (documentUiSession != importSession) return@onFailure
                     isCapturing = false
                     Log.e("JuZiScan", "Multi photo picker decode failed", error)
                     Toast.makeText(
@@ -1196,6 +1281,7 @@ private fun ScannerFlowScreen(
                         }
                     }
                 }.onFailure { error ->
+                    if (error is CancellationException) throw error
                     isCapturing = false
                     Log.e("JuZiScan", "Single photo picker decode failed", error)
                     Toast.makeText(
@@ -1235,61 +1321,16 @@ private fun ScannerFlowScreen(
 
         fun finishDocument() {
             val origin = documentReturnStage
-            processingQueue.reset()
-            clearTemporaryProcessedPages(context, pages)
+            documentSaver.detach(currentDocumentRecordId)
             returnToHome()
             stage = origin
             refreshHistoryRecords()
         }
 
-        fun documentActionBlocked(): Boolean = isProcessingPreview || isSavingDocument || documentSaveError ||
-            (stage == ScanStage.Preview && pages.isNotEmpty() &&
-                documentFingerprint(pages) != savedDocumentFingerprint)
-
-        /** 等待全部页面处理完成（当前页优先）后再执行导出动作，避免导出缺页或错误内容。 */
-        fun runWhenPagesReady(action: () -> Unit) {
-            if (documentActionBlocked()) return
-            val pending = pages.filter { !it.hasProcessedOutput }
-            if (pending.isEmpty()) {
-                action()
-                return
-            }
-            if (isProcessingPreview) return
-            isProcessingPreview = true
-            processingMessage = "正在完成页面处理…"
-            pending.forEach { processingQueue.submit(it.id) }
-            promoteActivePage()
-            scope.launch {
-                try {
-                    val settled = withTimeoutOrNull(180_000L) {
-                        snapshotFlow {
-                            pages.isNotEmpty() && pages.all { page ->
-                                page.hasProcessedOutput || pagePhases[page.id] == PageProcessingPhase.FAILED
-                            }
-                        }.first { it }
-                    } == true
-                    when {
-                        pages.all { it.hasProcessedOutput } -> action()
-                        settled -> Toast.makeText(
-                            context,
-                            "部分页面处理失败，请重试后再导出",
-                            Toast.LENGTH_LONG
-                        ).show()
-                        else -> Toast.makeText(
-                            context,
-                            "页面处理超时，请稍后重试",
-                            Toast.LENGTH_LONG
-                        ).show()
-                    }
-                } finally {
-                    isProcessingPreview = false
-                    processingMessage = "正在处理…"
-                }
-            }
-        }
+        fun documentActionBlocked(): Boolean = isProcessingPreview ||
+            documentSaver.hasPendingChanges(currentDocumentRecordId) || refreshDocumentStateIfNeeded()
 
         fun leaveDocumentPreview() {
-            if (documentActionBlocked()) return
             if (openedFromHistory) finishDocument() else showExitDialog = true
         }
 
@@ -1313,62 +1354,10 @@ private fun ScannerFlowScreen(
             }
         }
 
-        // A single, long-lived consumer. Changing stage/ID never cancels a disk transaction.
-        // 页面是否完成高清处理不再参与触发：原图先落盘，处理完成后再增量补写缓存。
-        LaunchedEffect(vm) {
-            snapshotFlow {
-                if (stage == ScanStage.Preview && !isProcessingPreview && !documentSaveError &&
-                    pages.isNotEmpty() && documentFingerprint(pages) != savedDocumentFingerprint
-                ) pages else null
-            }.filterNotNull().collect { snapshot ->
-                // 增量保存静默执行，不使用整页遮罩；浏览与翻页不受影响。
-                isSavingDocument = true
-                try {
-                    val id = currentDocumentRecordId
-                    val record = withContext(NonCancellable + Dispatchers.IO) {
-                        historyRepository.saveDocumentRecord(snapshot, id)
-                    }
-                    currentDocumentRecordId = record.id
-                    savedDocumentFingerprint = record.documentFingerprint
-                    // Record the committed identity before rebinding the UI pages so a
-                    // later UI failure cannot retry a new document with another ID.
-                    // 保存挂起期间用户可能已完成新的排序：回填以当前 UI 列表的顺序为基准，
-                    // 按稳定页 ID 合并提交后的持久化路径，避免旧顺序覆盖用户的新排序。
-                    val committedById = snapshot.associateBy { it.id }
-                    pages = pages.map { current ->
-                        val committed = committedById[current.id]
-                        if (committed != null) {
-                            val (sourcePath, processedPath) = historyRepository.pageAssetPaths(record.id, committed)
-                            current.copy(
-                                sourceImagePath = sourcePath,
-                                processedImagePath = processedPath,
-                                sourceBitmap = requireNotNull(current.previewBitmap ?: current.sourceBitmap),
-                                reviewBitmap = null,
-                                processedBitmap = null
-                            )
-                        } else {
-                            current
-                        }
-                    }
-                    withContext(Dispatchers.IO) { clearTemporaryProcessedPages(context, snapshot) }
-                    // 保存时缓存缺失或被清理的页面继续后台补齐，文档不会停在缺图状态。
-                    submitPendingPages()
-                    promoteActivePage()
-                    refreshHistoryRecords()
-                } catch (error: Exception) {
-                    if (error is CancellationException) throw error
-                    documentSaveError = true
-                    Log.e("JuZiScan", "Save document history failed", error)
-                } finally {
-                    isSavingDocument = false
-                }
-            }
-        }
-
         BackHandler(enabled = isProcessingPreview || (currentTask == CaptureTask.Document && stage in listOf(
             ScanStage.Preview, ScanStage.Capture, ScanStage.EdgeReview, ScanStage.Reorder, ScanStage.ShareSave
         ))) {
-            if (!isProcessingPreview && !documentSaveError) {
+            if (stage == ScanStage.Preview || !isProcessingPreview) {
                 when (stage) {
                     ScanStage.Preview -> leaveDocumentPreview()
                     ScanStage.Capture -> if (!isCapturing) {
@@ -1610,7 +1599,7 @@ private fun ScannerFlowScreen(
                             },
                             captureMode = captureMode,
                             flashMode = flashMode,
-                            isCapturing = isCapturing,
+                            isCapturing = isCapturing || imageCapture == null,
                             autoCaptureUiState = autoCaptureUiState,
                             latestPreviewBitmap = pages.lastOrNull()?.previewBitmap ?: pages.lastOrNull()?.sourceBitmap,
                             latestPreviewRotationDegrees = pages.lastOrNull()?.rotationDegrees ?: 0f,
@@ -1727,6 +1716,24 @@ private fun ScannerFlowScreen(
                             },
                             onNext = {
                                 if (isProcessingPreview) return@EdgeReviewScreen
+                                if (currentTask == CaptureTask.Document) {
+                                    val original = editingDocumentPage
+                                    if (original != null) {
+                                        var quad = editableQuad.map { PointF(it.x, it.y) }
+                                        val turns = (normalizePageRotation(original.rotationDegrees) / 90f).toInt()
+                                        repeat((4 - turns) % 4) { quad = rotateQuadClockwise(quad) }
+                                        val edited = original.copy(editableQuad = quad, correctionMode = correctionMode,
+                                            processedImagePath = null, processedBitmap = null)
+                                        val updated = pages.map { if (it.id == original.id) edited else it }
+                                        if (commitPageEdits(updated)) {
+                                            replacingIndex = null
+                                            editingDocumentPage = null
+                                            clearEditorAfterUse()
+                                            stage = ScanStage.Preview
+                                        }
+                                        return@EdgeReviewScreen
+                                    }
+                                }
                                 isProcessingPreview = true
                                 processingMessage = "正在处理…"
                                 scope.launch {
@@ -1827,7 +1834,7 @@ private fun ScannerFlowScreen(
                                 // 用户切换页面时提升该页处理优先级。
                                 promoteActivePage()
                             },
-                            onRetryPage = { processingQueue.retry(it) },
+                            onRetryPage = { currentDocumentRecordId?.let { id -> documentSaver.retry(id) } },
                             onBack = { leaveDocumentPreview() },
                             onAdd = {
                                 if (documentActionBlocked()) return@PreviewResultScreen
@@ -1839,7 +1846,7 @@ private fun ScannerFlowScreen(
                                 if (documentActionBlocked()) return@PreviewResultScreen
                                 val currentIndex = activeIndex
                                 val pageToRotate = pages.getOrNull(currentIndex) ?: return@PreviewResultScreen
-                                pages = pages.mapIndexed { idx, page ->
+                                commitPageEdits(pages.mapIndexed { idx, page ->
                                     if (idx == currentIndex) {
                                         pageToRotate.copy(
                                             rotationDegrees = normalizePageRotation(pageToRotate.rotationDegrees + 90f)
@@ -1847,35 +1854,37 @@ private fun ScannerFlowScreen(
                                     } else {
                                         page
                                     }
-                                }
+                                })
                             },
                             onPrint = {
-                                // 打印需要完整 PDF：未处理页面先补齐，避免缺页或错误内容。
-                                runWhenPagesReady {
-                                    runCatching {
-                                        executePrint(
-                                            context = context,
-                                            pages = pages,
-                                            fileName = buildPrintJobName(),
-                                            fileSize = ExportFileSize.Actual
-                                        )
-                                    }.onFailure { error ->
-                                        Log.e("JuZiScan", "Print failed", error)
-                                        Toast.makeText(
-                                            context,
-                                            "打开打印预览失败，请重试",
-                                            Toast.LENGTH_LONG
-                                        ).show()
-                                    }
+                                val id = ensureDocumentId()
+                                val session = documentUiSession
+                                val printJobName = buildPrintJobName()
+                                scope.launch {
+                                    var snapshot: File? = null
+                                    try {
+                                        val pdf = withContext(Dispatchers.IO) {
+                                            val source = historyRepository.ensureDocumentPdf(id)
+                                            File.createTempFile("document-", "-print.pdf", context.cacheDir).also {
+                                                snapshot = it
+                                                source.copyTo(it, overwrite = true)
+                                            }
+                                        }
+                                        if (currentDocumentRecordId == id && documentUiSession == session && stage == ScanStage.Preview) {
+                                            executePrintFile(context, pdf, printJobName)
+                                            snapshot = null // The system print adapter now owns this cache snapshot.
+                                        }
+                                    } catch (error: Exception) {
+                                        if (error is CancellationException) throw error
+                                        Toast.makeText(context, "打开打印预览失败，请重试", Toast.LENGTH_LONG).show()
+                                    } finally { snapshot?.delete() }
                                 }
                             },
                             onShare = {
-                                runWhenPagesReady {
-                                    shareSavePages = pages
-                                    shareSaveReturnStage = ScanStage.Preview
-                                    shareSaveDefaultWatermarkText = "仅供本人使用"
-                                    stage = ScanStage.ShareSave
-                                }
+                                shareSavePages = pages
+                                shareSaveReturnStage = ScanStage.Preview
+                                shareSaveDefaultWatermarkText = "仅供本人使用"
+                                stage = ScanStage.ShareSave
                             },
                             onEdit = { if (!documentActionBlocked()) openEdgeReviewForPage(activeIndex) },
                             onReplace = {
@@ -1893,7 +1902,7 @@ private fun ScannerFlowScreen(
                                 }
                                 val newPages = pages.toMutableList()
                                 newPages.removeAt(activeIndex)
-                                pages = newPages
+                                if (!commitPageEdits(newPages)) return@PreviewResultScreen
                                 if (pages.isEmpty()) {
                                     returnToHome()
                                 } else {
@@ -1901,6 +1910,7 @@ private fun ScannerFlowScreen(
                                 }
                             },
                             onReorder = {
+                                refreshDocumentStateIfNeeded()
                                 // 拖动排序只改页面 ID 的顺序元数据：页面列表一出现即可进入，
                                 // 不必等待增强、缓存写入或 PDF，保存中的事务也不阻塞排序。
                                 stage = ScanStage.Reorder
@@ -1923,7 +1933,7 @@ private fun ScannerFlowScreen(
                             if (reordered.isEmpty()) {
                                 deleteCurrentDocument()
                             } else {
-                                pages = reordered
+                                if (!commitPageEdits(reordered)) return@ReorderScreen
                                 activeIndex = activeIndex.coerceIn(0, pages.lastIndex)
                                 stage = ScanStage.Preview
                             }
@@ -1948,24 +1958,21 @@ private fun ScannerFlowScreen(
                                 stage = ScanStage.Vip
                             },
                             onShare = { fileName, fileType, fileSize, watermarkSettings ->
-                                runCatching {
-                                    executeShare(
-                                        context = context,
-                                        pages = exportPages,
-                                        fileName = fileName,
-                                        fileType = fileType,
-                                        fileSize = fileSize,
-                                        watermarkSettings = watermarkSettings
-                                    )
-                                }.onSuccess {
-                                    stage = shareSaveReturnStage
-                                }.onFailure { error ->
-                                    Log.e("JuZiScan", "Share failed", error)
-                                    Toast.makeText(
-                                        context,
-                                        "分享失败，请重试",
-                                        Toast.LENGTH_LONG
-                                    ).show()
+                                val id = currentDocumentRecordId
+                                val session = documentUiSession
+                                scope.launch {
+                                    try {
+                                        withContext(Dispatchers.IO) {
+                                            val ready = if (id != null && currentTask == CaptureTask.Document)
+                                                historyRepository.prepareDocumentPages(id) else exportPages
+                                            executeShare(context, ready, fileName, fileType, fileSize, watermarkSettings)
+                                        }
+                                        if (currentDocumentRecordId == id && documentUiSession == session && stage == ScanStage.ShareSave)
+                                            stage = shareSaveReturnStage
+                                    } catch (error: Exception) {
+                                        if (error is CancellationException) throw error
+                                        Toast.makeText(context, "分享失败，请重试", Toast.LENGTH_LONG).show()
+                                    }
                                 }
                             },
                             onFeedbackClick = { showFeedbackDialog = true }
@@ -2232,6 +2239,7 @@ private fun ScannerFlowScreen(
                     onDismiss = { showExitDialog = false },
                     onRescan = {
                         showExitDialog = false
+                        documentSaver.detach(currentDocumentRecordId)
                         startEntry(currentTask.entry, openCapture = true)
                     },
                     onReturnHome = {
@@ -2240,23 +2248,16 @@ private fun ScannerFlowScreen(
                     }
                 )
             }
-            if (documentSaveError) {
-                AlertDialog(
-                    onDismissRequest = { },
-                    title = { Text("文档未保存") },
-                    text = { Text("本次修改未能完成，请重试。退出将放弃本次修改，保留上次保存的文档。") },
-                    confirmButton = { TextButton(onClick = {
-                        val root = java.io.File(context.cacheDir, "document-page-processing").absolutePath + java.io.File.separator
-                        clearTemporaryProcessedPages(context, pages)
-                        // 保存失败的临时处理图不再有效，回到未处理状态由后台重新处理。
-                        pages = pages.map { page ->
-                            if (page.processedImagePath?.startsWith(root) == true) page.copy(processedImagePath = null) else page
-                        }
-                        documentSaveError = false
-                        openPreviewAt(activeIndex)
-                    }) { Text("重试") } },
-                    dismissButton = { TextButton(onClick = { finishDocument() }) { Text("放弃本次修改") } }
-                )
+            saveFailures.entries.firstOrNull()?.let { failure ->
+                Column(modifier = Modifier.align(Alignment.BottomCenter).navigationBarsPadding()
+                    .padding(16.dp).background(Color.White, RoundedCornerShape(16.dp)).padding(16.dp)) {
+                    Text("文档未保存", color = HpSmartColors.TextPrimary, fontWeight = FontWeight.Bold)
+                    Text("${failure.value}。已保存的页面和修改会保留。", color = HpSmartColors.TextSecondary)
+                    Row {
+                        TextButton(onClick = { documentSaver.retry(failure.key) }) { Text("重试") }
+                        TextButton(onClick = { documentSaver.dismissFailure(failure.key) }) { Text("稍后处理") }
+                    }
+                }
             }
             if (showAuthDialog) {
                 Dialog(

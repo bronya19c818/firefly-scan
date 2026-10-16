@@ -108,6 +108,7 @@ data class ScannedPage(
     // File-backed pages retain only a small display bitmap until editing/export.
     val sourceImagePath: String? = null,
     val processedImagePath: String? = null,
+    val detectedQuad: List<PointF> = emptyList(),
     val contentRevision: String = java.util.UUID.randomUUID().toString(),
     val imageStyle: String = "default"
 ) {

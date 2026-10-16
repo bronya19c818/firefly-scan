@@ -157,7 +157,8 @@ class HistoryDocumentPersistenceTest {
                     repository.saveDocumentRecord(pages.map { it.copy(rotationDegrees = 90f) }, record.id)
                 }.isFailure)
                 assertArrayEquals(index, File(context.filesDir, "history/records.json").readBytes())
-                assertArrayEquals("索引失败必须回滚已提交清单", manifest, manifestBytes(record))
+                assertEquals("索引失败后可靠清单仍保留已提交修改", 90f,
+                    HistoryRepository(context).loadDocumentPages(record.id).first().rotationDegrees)
             } finally { blockedIndex.deleteRecursively() }
             assertEquals("索引失败后文档仍可读", pages.map { it.id },
                 HistoryRepository(context).loadDocumentPages(record.id).map { it.id })

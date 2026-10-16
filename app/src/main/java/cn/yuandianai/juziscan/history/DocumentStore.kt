@@ -4,6 +4,7 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.PointF
 import android.util.Log
+import androidx.core.util.AtomicFile
 import cn.yuandianai.juziscan.scan.*
 import cn.yuandianai.juziscan.scanner.SimpleDocumentScanner
 import java.io.File
@@ -18,7 +19,8 @@ import java.io.IOException
  */
 internal class DocumentStore(private val root: File) {
 
-    fun save(documentDir: File, pages: List<ScannedPage>): DocumentManifest {
+    fun save(documentDir: File, pages: List<ScannedPage>, metadata: DocumentManifest? = null,
+             reliableOnly: Boolean = false): DocumentManifest {
         check(documentDir.canonicalPath.startsWith(root.canonicalPath + File.separator) ||
             documentDir.canonicalPath == root.canonicalPath) { "文档目录越界" }
         require(pages.isNotEmpty()) { "文档没有页面" }
@@ -58,11 +60,11 @@ internal class DocumentStore(private val root: File) {
                 check(File(pagesDir, page.id).isDirectory || File(pagesDir, page.id).mkdirs()) { "无法创建页面目录" }
                 writeSourceAtomically(sourceFile, page)
             }
-            if (plan.writeProcessedCache) {
+            if (plan.writeProcessedCache && !reliableOnly) {
                 writeProcessedCacheAtomically(processedFile, page)
             }
             plan.obsoleteSourceFile?.let { revision ->
-                obsoleteFiles += File(File(pagesDir, page.id), "$revision${SOURCE_EXT}")
+                obsoleteFiles += File(File(pagesDir, page.id), revision + (oldEntries[page.id]?.sourceExtension ?: SOURCE_EXT))
             }
             plan.obsoleteCacheKey?.let { key ->
                 obsoleteFiles += File(processedCacheDir(documentDir, page.id), "$key${PROCESSED_EXT}")
@@ -72,8 +74,10 @@ internal class DocumentStore(private val root: File) {
         }
 
         // 唯一提交点：所有页面资产写入成功后，原子替换清单。
-        val manifest = DocumentManifest(pages = entries, coverSignature = computeCoverSignature(entries.first()))
+        val manifest = (metadata ?: oldManifest ?: DocumentManifest(pages = entries, coverSignature = ""))
+            .copy(schemaVersion = DocumentManifest.SCHEMA_VERSION, pages = entries, coverSignature = computeCoverSignature(entries.first()))
         writeManifestAtomically(documentDir, manifest)
+        if (reliableOnly) return manifest
         ensureThumbnail(documentDir, manifest, oldManifest?.coverSignature)
         invalidatePdfCache(documentDir)
 
@@ -114,6 +118,7 @@ internal class DocumentStore(private val root: File) {
                 previewBitmap = preview,
                 sourceImagePath = sourceFile.path,
                 processedImagePath = processedPath,
+                detectedQuad = readDetectedQuad(processedFile),
                 contentRevision = entry.contentRevision,
                 imageStyle = entry.imageStyle,
                 rotationDegrees = entry.rotationDegrees,
@@ -130,6 +135,16 @@ internal class DocumentStore(private val root: File) {
     /** 已保存文档页面的原图文件路径（保存提交后重绑定内存页面使用）。 */
     fun pageSourcePathFor(documentDir: File, page: ScannedPage): String =
         pageSourceFile(documentDir, buildEntry(page)).path
+
+    fun maintainCaches(documentDir: File) {
+        val manifest = readManifestOrNull(documentDir) ?: return
+        val signature = File(documentDir, "$CACHE_DIR/thumbnail.meta").takeIf { it.isFile }?.readText()
+            ?: manifest.coverSignature.takeIf { manifest.recordId == null }
+        if (processedCacheFile(documentDir, manifest.pages.first()).isFile) {
+            ensureThumbnail(documentDir, manifest, signature)
+        }
+        cleanupObsoleteAssets(documentDir, manifest, emptyList())
+    }
 
     fun pdfCacheFile(documentDir: File): File = File(File(documentDir, CACHE_DIR), PDF_NAME)
 
@@ -156,7 +171,8 @@ internal class DocumentStore(private val root: File) {
             }
             entry
         }
-        val manifest = DocumentManifest(pages = entries, coverSignature = computeCoverSignature(entries.first()))
+        val manifest = (readManifestOrNull(documentDir) ?: DocumentManifest(pages = entries, coverSignature = ""))
+            .copy(schemaVersion = DocumentManifest.SCHEMA_VERSION, pages = entries, coverSignature = computeCoverSignature(entries.first()))
         writeManifestAtomically(documentDir, manifest)
         ensureThumbnail(documentDir, manifest, oldCoverSignature)
         return File(documentDir, MANIFEST_NAME).absolutePath
@@ -180,11 +196,12 @@ internal class DocumentStore(private val root: File) {
             rotationDegrees = normalizePageRotation(page.rotationDegrees),
             correctionMode = page.correctionMode.name,
             imageStyle = page.imageStyle,
-            quad = quad
+            quad = quad,
+            sourceExtension = if (page.sourceImagePath?.endsWith(".jpg") == true) ".jpg" else ".png"
         )
     }
 
-    private fun readManifestOrNull(documentDir: File): DocumentManifest? {
+    fun readManifestOrNull(documentDir: File): DocumentManifest? {
         val file = File(documentDir, MANIFEST_NAME)
         if (!file.isFile || file.length() == 0L) return null
         return try {
@@ -196,7 +213,7 @@ internal class DocumentStore(private val root: File) {
     }
 
     private fun pageSourceFile(documentDir: File, entry: ManifestPageEntry): File =
-        File(File(documentDir, "$PAGES_DIR/${entry.id}"), entry.contentRevision + SOURCE_EXT)
+        File(File(documentDir, "$PAGES_DIR/${entry.id}"), entry.contentRevision + entry.sourceExtension)
 
     private fun processedCacheDir(documentDir: File, pageId: String): File =
         File(documentDir, "$CACHE_DIR/$PAGES_DIR/$pageId")
@@ -205,10 +222,16 @@ internal class DocumentStore(private val root: File) {
         File(processedCacheDir(documentDir, entry.id), entry.cacheKey + PROCESSED_EXT)
 
     private fun writeSourceAtomically(target: File, page: ScannedPage) {
+        if (target.isFile && target.length() > 0) return
         val existing = page.sourceImagePath?.let { File(it) }
+        require(page.sourceImagePath == null || (existing?.isFile == true && existing.length() > 0)) {
+            "原图文件缺失，无法保存页面"
+        }
         if (existing != null && existing.isFile) {
             if (existing.canonicalPath == target.canonicalPath) return
-            copyFileAtomically(existing, target)
+            // CameraX staging and permanent assets share a filesystem; move the encoded original once.
+            if (!existing.canonicalPath.startsWith(File(root.parentFile, "captures").canonicalPath + File.separator) ||
+                !existing.renameTo(target)) copyFileAtomically(existing, target)
         } else {
             val bitmap = requireNotNull(page.sourceBitmap) { "页面尚未处理完成" }
             writeBitmapFileAtomically(target, bitmap, Bitmap.CompressFormat.PNG, 100)
@@ -277,6 +300,9 @@ internal class DocumentStore(private val root: File) {
             val small = preparePreviewBitmap(rotated, 360)
             try {
                 writeBitmapFileAtomically(thumbnail, small, Bitmap.CompressFormat.JPEG, 88)
+                val signature = File(documentDir, "$CACHE_DIR/thumbnail.meta")
+                check(signature.parentFile!!.isDirectory || signature.parentFile!!.mkdirs())
+                writeBytesAtomically(signature, manifest.coverSignature.toByteArray(Charsets.UTF_8))
             } finally {
                 if (small !== rotated && !small.isRecycled) small.recycle()
             }
@@ -297,7 +323,8 @@ internal class DocumentStore(private val root: File) {
                 // 只保留当前内容版本的不可变原图。
                 val revision = manifest.pages.first { it.id == pageDir.name }.contentRevision
                 pageDir.listFiles()?.forEach { file ->
-                    if (file.name != revision + SOURCE_EXT && file.name.endsWith(SOURCE_EXT)) {
+                    val extension = manifest.pages.first { it.id == pageDir.name }.sourceExtension
+                    if (file.name != revision + extension && (file.name.endsWith(".png") || file.name.endsWith(".jpg"))) {
                         if (!file.delete()) Log.w("JuZiScan", "Could not remove obsolete page source")
                     }
                 }
@@ -307,7 +334,9 @@ internal class DocumentStore(private val root: File) {
             val cacheDir = processedCacheDir(documentDir, entry.id)
             if (cacheDir.isDirectory) {
                 cacheDir.listFiles()?.forEach { file ->
-                    if (!file.name.startsWith(entry.cacheKey)) {
+                    val abandonedWrite = (file.name.endsWith(".tmp") || file.name.endsWith(".new")) &&
+                        file.lastModified() < System.currentTimeMillis() - 24L * 60 * 60 * 1000
+                    if (!file.name.startsWith(entry.cacheKey) || abandonedWrite) {
                         if (!file.delete()) Log.w("JuZiScan", "Could not remove obsolete page cache")
                     }
                 }
@@ -337,37 +366,42 @@ internal class DocumentStore(private val root: File) {
 
     private fun copyFileAtomically(source: File, target: File) {
         val tmp = File(target.parentFile, target.name + TMP_SUFFIX)
-        source.inputStream().use { input ->
-            FileOutputStream(tmp).use { output ->
-                input.copyTo(output)
-                output.flush()
-                output.fd.sync()
+        try {
+            source.inputStream().use { input ->
+                FileOutputStream(tmp).use { output ->
+                    input.copyTo(output)
+                    output.flush()
+                    output.fd.sync()
+                }
             }
-        }
-        replaceFile(tmp, target)
+            replaceFile(tmp, target)
+        } finally { tmp.delete() }
     }
 
     private fun writeBitmapFileAtomically(target: File, bitmap: Bitmap, format: Bitmap.CompressFormat, quality: Int) {
         val tmp = File(target.parentFile, target.name + TMP_SUFFIX)
-        writeBitmapSynced(tmp, bitmap, format, quality)
-        replaceFile(tmp, target)
+        try {
+            writeBitmapSynced(tmp, bitmap, format, quality)
+            replaceFile(tmp, target)
+        } finally { tmp.delete() }
     }
 
     private fun writeBytesAtomically(target: File, bytes: ByteArray) {
-        val tmp = File(target.parentFile, target.name + TMP_SUFFIX)
-        FileOutputStream(tmp).use { output ->
+        val atomic = AtomicFile(target)
+        val output = atomic.startWrite()
+        try {
             output.write(bytes)
             output.flush()
             output.fd.sync()
+            atomic.finishWrite(output)
+            check(!File(target.path + ".new").exists()) { "文档清单提交失败" }
+        } catch (error: Throwable) {
+            atomic.failWrite(output)
+            throw error
         }
-        replaceFile(tmp, target)
     }
 
     private fun replaceFile(tmp: File, target: File) {
-        if (target.exists() && !target.delete()) {
-            tmp.delete()
-            throw IOException("无法替换文件: ${target.name}")
-        }
         check(tmp.renameTo(target)) { "无法提交文件: ${target.name}" }
     }
 

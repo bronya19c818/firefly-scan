@@ -42,6 +42,8 @@ fun processDocumentPage(
     try {
         val quad = if (page.editableQuad.size == 4) {
             page.editableQuad
+        } else if (page.detectedQuad.size == 4) {
+            page.detectedQuad
         } else {
             val working = prepareWorkingBitmap(source)
             try {
@@ -98,6 +100,16 @@ fun processDocumentPage(
                 tmp.delete()
             }
             if (processedOutput != null) {
+                val detected = org.json.JSONArray().apply { quad.forEach {
+                    put(org.json.JSONArray().put(it.x.toDouble()).put(it.y.toDouble()))
+                } }
+                val atomic = androidx.core.util.AtomicFile(File(output.path + ".quad"))
+                val stream = atomic.startWrite()
+                try {
+                    stream.write(detected.toString().toByteArray(Charsets.UTF_8))
+                    stream.fd.sync()
+                    atomic.finishWrite(stream)
+                } catch (error: Throwable) { atomic.failWrite(stream); throw error }
                 // 直接写入文档缓存时顺带落一份预览缓存，加速下次打开。
                 runCatching {
                     val previewTmp = File(output.parentFile,
@@ -118,7 +130,7 @@ fun processDocumentPage(
         if (preview !== processed && !processed.isRecycled) processed.recycle()
         return page.copy(
             reviewBitmap = null,
-            editableQuad = quad,
+            detectedQuad = quad,
             processedBitmap = null,
             processedImagePath = output.path,
             previewBitmap = previewImage
@@ -128,6 +140,20 @@ fun processDocumentPage(
         if (processed != null && processed !== preview && !processed.isRecycled) processed.recycle()
         if (corrected != null && corrected !== source && !corrected.isRecycled) corrected.recycle()
         decodedSource?.takeIf { !it.isRecycled }?.recycle()
+    }
+}
+
+fun readDetectedQuad(processed: File): List<android.graphics.PointF> {
+    val file = File(processed.path + ".quad")
+    if (!file.isFile) return emptyList()
+    return runCatching {
+        val array = org.json.JSONArray(file.readText(Charsets.UTF_8))
+        (0 until array.length()).map { index -> array.getJSONArray(index).let {
+            android.graphics.PointF(it.getDouble(0).toFloat(), it.getDouble(1).toFloat())
+        } }
+    }.getOrElse { error ->
+        android.util.Log.w("JuZiScan", "Could not read detected edges cache", error)
+        emptyList()
     }
 }
 
