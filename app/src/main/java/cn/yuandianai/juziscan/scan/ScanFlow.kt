@@ -701,7 +701,7 @@ private fun ScannerFlowScreen(
                                 quad = defaultDocumentQuad()
                             )
                         } else {
-                            processSourceBitmap(context, bitmap)
+                            processSourceBitmap(context, bitmap, preserveOriginal = currentTask == CaptureTask.Document)
                         }
                     }
                 }.onSuccess { result ->
@@ -818,40 +818,73 @@ private fun ScannerFlowScreen(
             }
         }
 
+        fun clearTemporaryProcessedPages(input: List<ScannedPage>) {
+            runCatching {
+                val root = java.io.File(context.cacheDir, "document-page-processing").canonicalPath + java.io.File.separator
+                input.mapNotNull { it.processedImagePath }.distinct().forEach { path ->
+                    val file = java.io.File(path)
+                    if (file.canonicalPath.startsWith(root) && file.exists() && !file.delete()) {
+                        Log.w("JuZiScan", "Could not remove temporary processed page")
+                    }
+                }
+            }.onFailure { Log.w("JuZiScan", "Could not clean temporary processed pages", it) }
+        }
+
         suspend fun processPageForPreview(page: ScannedPage): ScannedPage {
-            if (page.isProcessed && page.previewBitmap != null) {
+            if (page.processedImagePath?.let { java.io.File(it).isFile && java.io.File(it).length() > 0 } == true && page.previewBitmap != null) {
                 return page
             }
             return withContext(Dispatchers.Default) {
-                val workingBitmap = page.reviewBitmap ?: prepareWorkingBitmap(page.sourceBitmap)
+                val workingBitmap = if (page.processedBitmap == null) {
+                    page.reviewBitmap ?: prepareWorkingBitmap(page.sourceBitmap)
+                } else null
                 val quad = if (page.editableQuad.size == 4) {
                     page.editableQuad
                 } else {
-                    SimpleDocumentScanner.detectDocumentQuad(context, workingBitmap) ?: emptyList()
+                    workingBitmap?.let { SimpleDocumentScanner.detectDocumentQuad(context, it) } ?: emptyList()
                 }
-                val corrected = if (quad.size == 4) {
+                val corrected = if (page.processedBitmap == null && quad.size == 4) {
                     SimpleDocumentScanner.perspectiveCorrect(
                         page.sourceBitmap,
                         quad,
-                        page.correctionMode
+                        page.correctionMode,
+                        maxOutputSide = DOCUMENT_INPUT_MAX_SIDE
                     )
                 } else {
                     page.sourceBitmap
                 }
-                val processed = SimpleDocumentScanner.enhanceDocument(corrected)
-                page.copy(
-                    reviewBitmap = workingBitmap,
-                    editableQuad = quad,
-                    processedBitmap = processed,
-                    previewBitmap = preparePreviewBitmap(processed)
-                )
+                var processed: Bitmap? = null
+                try {
+                    val result = page.processedBitmap ?: SimpleDocumentScanner.enhanceDocument(corrected)
+                    processed = result
+                    val preview = preparePreviewBitmap(result, 640)
+                    val directory = java.io.File(context.cacheDir, "document-page-processing").apply {
+                        check(isDirectory || mkdirs()) { "无法创建页面临时目录" }
+                    }
+                    val file = java.io.File.createTempFile("page-", ".png", directory)
+                    try {
+                        withContext(Dispatchers.IO) {
+                            file.outputStream().use { check(result.compress(Bitmap.CompressFormat.PNG, 100, it)) { "页面暂存失败" } }
+                        }
+                        page.copy(reviewBitmap = null, editableQuad = quad, processedBitmap = null,
+                            processedImagePath = file.path, previewBitmap = preview)
+                    } catch (error: Throwable) {
+                        file.delete()
+                        throw error
+                    }
+                } finally {
+                    if (corrected !== page.sourceBitmap && corrected !== processed && !corrected.isRecycled) corrected.recycle()
+                }
             }
         }
 
         suspend fun ensurePagesProcessed(inputPages: List<ScannedPage>): List<ScannedPage> {
             return inputPages.mapIndexed { index, page ->
                 processingMessage = "正在处理第 ${index + 1}/${inputPages.size} 页…"
-                processPageForPreview(page)
+                processPageForPreview(page).also { processed ->
+                    // Retain completed file paths on failure so retries do not redo earlier pages.
+                    pages = pages.toMutableList().apply { this[index] = processed }
+                }
             }
         }
 
@@ -1022,7 +1055,9 @@ private fun ScannerFlowScreen(
                         override fun onCaptureSuccess(image: ImageProxy) {
                             try {
                                 val rotationDegrees = image.imageInfo.rotationDegrees.toFloat()
-                                val bitmap = imageProxyToBitmap(image, SCAN_INPUT_MAX_SIDE)
+                                val bitmap = imageProxyToBitmap(image,
+                                    if (taskAtCapture == CaptureTask.Document) DOCUMENT_INPUT_MAX_SIDE else SCAN_INPUT_MAX_SIDE,
+                                    jpegQuality = if (taskAtCapture == CaptureTask.Document) 95 else 75)
                                 if (bitmap == null) {
                                     mainExecutor.execute {
                                         isCapturing = false
@@ -1095,7 +1130,8 @@ private fun ScannerFlowScreen(
                 runCatching {
                     withContext(Dispatchers.IO) {
                         uris.mapNotNull { uri ->
-                            loadBitmapFromUri(context, uri, SCAN_INPUT_MAX_SIDE)
+                            loadBitmapFromUri(context, uri,
+                                if (currentTask == CaptureTask.Document) DOCUMENT_INPUT_MAX_SIDE else SCAN_INPUT_MAX_SIDE)
                                 ?.let { bitmap -> uri to bitmap }
                         }
                     }
@@ -1151,7 +1187,8 @@ private fun ScannerFlowScreen(
             scope.launch {
                 runCatching {
                     withContext(Dispatchers.IO) {
-                        loadBitmapFromUri(context, uri, SCAN_INPUT_MAX_SIDE)
+                        loadBitmapFromUri(context, uri,
+                            if (currentTask == CaptureTask.Document) DOCUMENT_INPUT_MAX_SIDE else SCAN_INPUT_MAX_SIDE)
                     }
                 }.onSuccess { bitmap ->
                     if (bitmap == null) {
@@ -1205,6 +1242,7 @@ private fun ScannerFlowScreen(
 
         fun finishDocument() {
             val origin = documentReturnStage
+            clearTemporaryProcessedPages(pages)
             returnToHome()
             stage = origin
             refreshHistoryRecords()
@@ -1266,6 +1304,7 @@ private fun ScannerFlowScreen(
                         reviewBitmap = null,
                         processedBitmap = null
                     ) }
+                    withContext(Dispatchers.IO) { clearTemporaryProcessedPages(snapshot) }
                     refreshHistoryRecords()
                 } catch (error: Exception) {
                     if (error is CancellationException) throw error
@@ -1655,9 +1694,15 @@ private fun ScannerFlowScreen(
                                                 val corrected = SimpleDocumentScanner.perspectiveCorrect(
                                                     originalBitmap,
                                                     editableQuad,
-                                                    correctionMode
+                                                    correctionMode,
+                                                    maxOutputSide = if (currentTask == CaptureTask.Document) DOCUMENT_INPUT_MAX_SIDE else SCAN_INPUT_MAX_SIDE
                                                 )
-                                                SimpleDocumentScanner.enhanceDocument(corrected)
+                                                var enhanced: Bitmap? = null
+                                                try {
+                                                    SimpleDocumentScanner.enhanceDocument(corrected).also { enhanced = it }
+                                                } finally {
+                                                    if (corrected !== originalBitmap && corrected !== enhanced && !corrected.isRecycled) corrected.recycle()
+                                                }
                                             }
                                         }
                                     }.onSuccess { processed ->
@@ -2143,8 +2188,13 @@ private fun ScannerFlowScreen(
                     title = { Text("文档未保存") },
                     text = { Text("本次修改未能完成，请重试。退出将放弃本次修改，保留上次保存的文档。") },
                     confirmButton = { TextButton(onClick = {
+                        val root = java.io.File(context.cacheDir, "document-page-processing").absolutePath + java.io.File.separator
+                        clearTemporaryProcessedPages(pages)
+                        pages = pages.map { page ->
+                            if (page.processedImagePath?.startsWith(root) == true) page.copy(processedImagePath = null) else page
+                        }
                         documentSaveError = false
-                        if (pages.any { !it.isProcessed }) openPreviewAt(activeIndex)
+                        openPreviewAt(activeIndex)
                     }) { Text("重试") } },
                     dismissButton = { TextButton(onClick = { finishDocument() }) { Text("放弃本次修改") } }
                 )

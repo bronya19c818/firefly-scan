@@ -26,6 +26,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import cn.yuandianai.juziscan.common.ShareUploadIcon
@@ -54,6 +55,7 @@ fun HistoryRecordCard(
 
     Row(
         modifier = modifier
+            .testTag("history-${record.id}")
             .fillMaxWidth()
             .background(Color.White, RoundedCornerShape(16.dp))
             .pointerInput(record.id) { detectTapGesturesCompat { onOpen(record) } }

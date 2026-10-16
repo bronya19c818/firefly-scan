@@ -14,6 +14,13 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.produceState
+import androidx.compose.ui.platform.LocalContext
+import android.net.Uri
+import android.util.Log
+import java.io.File
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -24,6 +31,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import cn.yuandianai.juziscan.common.*
 import cn.yuandianai.juziscan.scan.ScannedPage
+import cn.yuandianai.juziscan.scan.loadBitmapFromUri
+import cn.yuandianai.juziscan.scan.preparePreviewBitmap
 import cn.yuandianai.juziscan.ui.theme.HpSmartColors
 
 @Composable
@@ -121,12 +130,32 @@ fun PreviewResultScreen(
                 modifier = Modifier.fillMaxSize(),
                 verticalAlignment = Alignment.CenterVertically
             ) { pageIdx ->
+                val page = pages[pageIdx]
+                val context = LocalContext.current
+                val isCurrent = pageIdx == activeIndex
+                // Keep the document's thumbnails small; decode detail only for the visible page.
+                val detailedPreview by produceState<Bitmap?>(null, page.id, page.contentRevision,
+                    page.processedImagePath, page.processedBitmap, isCurrent) {
+                    value = null
+                    if (isCurrent) {
+                        value = withContext(Dispatchers.IO) {
+                            try {
+                                page.processedImagePath?.let {
+                                    loadBitmapFromUri(context, Uri.fromFile(File(it)), 2048)
+                                } ?: page.processedBitmap?.let { preparePreviewBitmap(it, 2048) }
+                            } catch (error: Exception) {
+                                Log.w("JuZiScan", "Could not load detailed page preview", error)
+                                null
+                            }
+                        }
+                    }
+                }
                 Box(
                     modifier = Modifier.fillMaxSize(),
                     contentAlignment = Alignment.Center
                 ) {
                     RotatedPreviewImage(
-                        bitmap = requireNotNull(pages[pageIdx].previewBitmap),
+                        bitmap = detailedPreview ?: requireNotNull(page.previewBitmap),
                         rotationDegrees = pages[pageIdx].rotationDegrees,
                         contentDescription = "扫描预览 ${pageIdx + 1}",
                         modifier = Modifier.fillMaxSize()

@@ -63,9 +63,10 @@ class HistoryProcessRestartE2eTest {
     }
 
     private fun open(id: String) {
-        val record = repository.loadRecords().first { it.id == id }
-        ui.waitUntil(30_000) { ui.onAllNodesWithText(record.title).fetchSemanticsNodes().isNotEmpty() }
-        ui.onAllNodesWithText(record.title)[0].performScrollTo().performTouchInput { click() }
+        ui.waitUntil(30_000) { ui.onAllNodesWithTag("history-$id").fetchSemanticsNodes().isNotEmpty() }
+        val title = repository.loadRecords().first { it.id == id }.title
+        ui.onNode(hasText(title) and hasAnyAncestor(hasTestTag("history-$id")))
+            .performScrollTo().performTouchInput { click() }
         ui.waitUntil(60_000) { ui.onAllNodesWithText("添加").fetchSemanticsNodes().isNotEmpty() }
         idle()
     }

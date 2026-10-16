@@ -121,6 +121,7 @@ fun hydratePageForEditing(page: ScannedPage): ScannedPage {
 }
 
 const val SCAN_INPUT_MAX_SIDE = 2200
+const val DOCUMENT_INPUT_MAX_SIDE = 4096
 private const val DEFAULT_BITMAP_MAX_SIDE = 4096
 
 internal fun calculateBoundedDimensions(
@@ -213,12 +214,12 @@ data class SourceBitmapProcessingResult(
     val quad: List<PointF>
 )
 
-fun processSourceBitmap(context: Context, bitmap: Bitmap): SourceBitmapProcessingResult {
+fun processSourceBitmap(context: Context, bitmap: Bitmap, preserveOriginal: Boolean = false): SourceBitmapProcessingResult {
     val workingBitmap = prepareWorkingBitmap(bitmap)
     val quad = SimpleDocumentScanner.detectDocumentQuad(context, workingBitmap) ?: emptyList()
-    if (workingBitmap !== bitmap && !bitmap.isRecycled) bitmap.recycle()
+    if (!preserveOriginal && workingBitmap !== bitmap && !bitmap.isRecycled) bitmap.recycle()
     return SourceBitmapProcessingResult(
-        sourceBitmap = workingBitmap,
+        sourceBitmap = if (preserveOriginal) bitmap else workingBitmap,
         reviewBitmap = workingBitmap,
         quad = quad
     )

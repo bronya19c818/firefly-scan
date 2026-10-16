@@ -7,6 +7,10 @@ import android.os.ParcelFileDescriptor
 import android.os.SystemClock
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onAllNodesWithTag
+import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -93,8 +97,9 @@ class SmartManualCaptureE2eTest {
             PdfRenderer(fd).use { assertEquals(5, it.pageCount) }
         }
         ui.activityRule.scenario.recreate()
-        ui.waitUntil(30_000) { ui.onAllNodesWithText(saved.title).fetchSemanticsNodes().isNotEmpty() }
-        ui.onAllNodesWithText(saved.title)[0].performScrollTo().performTouchInput { click() }
+        ui.waitUntil(30_000) { ui.onAllNodesWithTag("history-${saved.id}").fetchSemanticsNodes().isNotEmpty() }
+        ui.onNode(hasText(saved.title) and hasAnyAncestor(hasTestTag("history-${saved.id}")))
+            .performScrollTo().performTouchInput { click() }
         ui.waitUntil(60_000) {
             ui.onAllNodesWithText("添加").fetchSemanticsNodes().isNotEmpty()
         }

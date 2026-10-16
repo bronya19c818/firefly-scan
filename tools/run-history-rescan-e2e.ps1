@@ -30,7 +30,7 @@ foreach ($apk in @($appApk, $testApk)) {
     if ($LASTEXITCODE -ne 0) { throw "安装失败：$apk" }
 }
 Write-Host '请保持镜头对准光照充分的纸质文档。测试包含真实拍摄，将保留原有智能手拍回归产生的记录。'
-$classes = 'cn.yuandianai.juziscan.scan.HistoryDocumentPersistenceTest,cn.yuandianai.juziscan.scan.HistoryRescanE2eTest,cn.yuandianai.juziscan.scan.SmartManualCaptureTest,cn.yuandianai.juziscan.scan.SmartManualCaptureE2eTest'
+$classes = 'cn.yuandianai.juziscan.scan.HistoryDocumentPersistenceTest,cn.yuandianai.juziscan.scan.HistoryRescanE2eTest,cn.yuandianai.juziscan.scan.SmartManualCaptureTest,cn.yuandianai.juziscan.scan.SmartManualCaptureE2eTest,cn.yuandianai.juziscan.scan.HistoryQualityAndReorderE2eTest'
 if (!$ColdStartOnly) {
 $result = & $Adb -s $Serial shell am instrument -w -r -e class $classes 'cn.yuandianai.juziscan.test/androidx.test.runner.AndroidJUnitRunner' 2>&1
 $instrumentExit = $LASTEXITCODE
@@ -43,7 +43,7 @@ New-Item -ItemType Directory -Force -Path (Join-Path $ArtifactDirectory 'smart-m
 & $Adb -s $Serial pull '/sdcard/Android/data/cn.yuandianai.juziscan/files/smart-manual-e2e/.' (Join-Path $ArtifactDirectory 'smart-manual')
 if ($LASTEXITCODE -ne 0) { throw '导出连续扫描工件失败。' }
 $result | Write-Output
-if ($instrumentExit -ne 0 -or ($result -join "`n") -notmatch 'OK \(11 tests\)') {
+if ($instrumentExit -ne 0 -or ($result -join "`n") -notmatch 'OK \(14 tests\)') {
     throw "设备测试未通过，请检查 $ArtifactDirectory/instrumentation.txt"
 }
 }
@@ -68,5 +68,5 @@ foreach ($phase in $phases.GetEnumerator()) {
 }
 & $Adb -s $Serial logcat -d -t 4000 -s JuZiScan | Set-Content -LiteralPath (Join-Path $ArtifactDirectory 'app-log.txt') -Encoding UTF8
 if ($LASTEXITCODE -ne 0) { throw '导出最终应用日志失败。' }
-if ($ColdStartOnly) { Write-Host "3 个跨进程阶段通过；本次未运行 11 项基础回归。工件保存在 $ArtifactDirectory。" }
-else { Write-Host "14 项设备测试通过，工件保存在 $ArtifactDirectory；保留一份真实五页续扫文档供人工查看。" }
+if ($ColdStartOnly) { Write-Host "3 个跨进程阶段通过；本次未运行 14 项基础回归。工件保存在 $ArtifactDirectory。" }
+else { Write-Host "17 项设备测试通过，工件保存在 $ArtifactDirectory；保留一份真实五页续扫文档供人工查看。" }

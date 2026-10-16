@@ -25,6 +25,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.zIndex
 import cn.yuandianai.juziscan.common.CloseCrossIcon
 import cn.yuandianai.juziscan.scan.ScannedPage
 import cn.yuandianai.juziscan.ui.theme.HpSmartColors
@@ -36,7 +37,7 @@ fun ReorderScreen(
     onDone: (List<ScannedPage>) -> Unit
 ) {
     var localPages by remember(pages) { mutableStateOf(pages) }
-    var draggedIndex by remember { mutableStateOf<Int?>(null) }
+    var draggedPageId by remember { mutableStateOf<String?>(null) }
     var dragOffset by remember { mutableStateOf(Offset.Zero) }
 
     Column(
@@ -118,7 +119,7 @@ fun ReorderScreen(
             ) {
                 localPages.forEachIndexed { index, page ->
                     key(page.id) {
-                        val isDragging = index == draggedIndex
+                        val isDragging = page.id == draggedPageId
                         val tX = targetX(index)
                         val tY = targetY(index)
 
@@ -131,7 +132,7 @@ fun ReorderScreen(
                         val animatedOffset by animateOffsetAsState(
                             targetValue = targetOffset,
                             animationSpec = if (isDragging) snap() else spring(stiffness = Spring.StiffnessMedium),
-                            label = "card_offset_$index"
+                            label = "card_offset_${page.id}"
                         )
 
                         val xDp = with(density) { (if (isDragging) (tX + dragOffset.x) else animatedOffset.x).toDp() }
@@ -140,32 +141,33 @@ fun ReorderScreen(
                         Box(
                             modifier = Modifier
                                 .offset(x = xDp, y = yDp)
+                                .zIndex(if (isDragging) 1f else 0f)
                                 .width(itemWidth)
                                 .height(totalCellHeight)
                                 .shadow(
                                     elevation = if (isDragging) 8.dp else 0.dp,
                                     shape = RoundedCornerShape(8.dp)
                                 )
-                                .pointerInput(index) {
+                                .pointerInput(page.id, widthPx, density.density) {
                                     detectDragGestures(
                                         onDragStart = { _ ->
-                                            draggedIndex = index
+                                            draggedPageId = page.id
                                             dragOffset = Offset.Zero
                                         },
                                         onDragEnd = {
-                                            draggedIndex = null
+                                            draggedPageId = null
                                             dragOffset = Offset.Zero
                                         },
                                         onDragCancel = {
-                                            draggedIndex = null
+                                            draggedPageId = null
                                             dragOffset = Offset.Zero
                                         },
                                         onDrag = { change, dragAmount ->
                                             change.consume()
                                             dragOffset += dragAmount
 
-                                            val currentIdx = draggedIndex
-                                            if (currentIdx != null) {
+                                            val currentIdx = localPages.indexOfFirst { it.id == draggedPageId }
+                                            if (currentIdx >= 0) {
                                                 val currX = targetX(currentIdx) + dragOffset.x + itemWidthPx / 2f
                                                 val currY = targetY(currentIdx) + dragOffset.y + itemHeightPx / 2f
 
@@ -186,7 +188,6 @@ fun ReorderScreen(
                                                     val dy = targetY(currentIdx) - targetY(hoverIndex)
 
                                                     localPages = newPages
-                                                    draggedIndex = hoverIndex
                                                     dragOffset = Offset(dragOffset.x + dx, dragOffset.y + dy)
                                                 }
                                             }
@@ -220,7 +221,7 @@ fun ReorderScreen(
                                     .pointerInput(page.id) {
                                         detectTapGesturesCompat {
                                             val newPages = localPages.toMutableList()
-                                            newPages.removeAt(index)
+                                            newPages.removeAll { it.id == page.id }
                                             localPages = newPages
                                         }
                                     },

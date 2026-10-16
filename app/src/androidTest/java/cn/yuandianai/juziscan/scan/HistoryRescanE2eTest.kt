@@ -33,9 +33,11 @@ class HistoryRescanE2eTest {
         }
     }
 
-    private fun open(title: String) {
-        ui.waitUntil(30_000) { ui.onAllNodesWithText(title).fetchSemanticsNodes().isNotEmpty() }
-        ui.onAllNodesWithText(title)[0].performScrollTo().performTouchInput { click() }
+    private fun open(id: String) {
+        ui.waitUntil(30_000) { ui.onAllNodesWithTag("history-$id").fetchSemanticsNodes().isNotEmpty() }
+        val title = repository.loadRecords().first { it.id == id }.title
+        ui.onNode(hasText(title) and hasAnyAncestor(hasTestTag("history-$id")))
+            .performScrollTo().performTouchInput { click() }
         ui.waitUntil(60_000) { ui.onAllNodesWithText("添加").fetchSemanticsNodes().isNotEmpty() }
         ui.waitUntil(60_000) { ui.onAllNodesWithText("正在", substring = true).fetchSemanticsNodes().isEmpty() }
         ui.onNodeWithText("预览").assertExists()
@@ -54,7 +56,7 @@ class HistoryRescanE2eTest {
         val record = seed()
         try {
             ready()
-            open(record.title)
+            open(record.id)
             ui.onNodeWithText("1 / 3").assertExists()
             assertEquals(record.updatedAtMillis, repository.loadRecords().first { it.id == record.id }.updatedAtMillis)
             ui.onNodeWithText("旋转").performTouchInput { click() }
@@ -64,7 +66,7 @@ class HistoryRescanE2eTest {
             ui.onNodeWithText("最近文档").assertExists()
             ready()
             ui.onNodeWithText("查看全部").performScrollTo().performTouchInput { click() }
-            open(record.title)
+            open(record.id)
             ui.onNodeWithText("1 / 3").assertExists()
             assertEquals(90f, repository.loadDocumentPages(record.id)[0].rotationDegrees)
             evidence("all-documents-restored")
@@ -78,7 +80,7 @@ class HistoryRescanE2eTest {
         val record = seed()
         try {
             ready()
-            open(record.title)
+            open(record.id)
             ui.onNodeWithText("添加").performTouchInput { click() }
             enterCameraWhenReady(ui)
             ui.onNodeWithText("智能手拍").assertExists()
@@ -91,7 +93,7 @@ class HistoryRescanE2eTest {
             assertEquals(1, repository.loadRecords().count { it.id == record.id })
             evidence("same-document-five-pages")
             ready()
-            open(record.title)
+            open(record.id)
             ui.onNodeWithText("1 / 5").assertExists()
             evidence("five-pages-reopened")
         } finally { repository.deleteRecord(record.id) }
@@ -101,7 +103,8 @@ class HistoryRescanE2eTest {
         val record = seed()
         try {
             ready()
-            open(record.title)
+            open(record.id)
+            ui.onNodeWithText("1 / 3").assertExists()
             val originalIds = repository.loadDocumentPages(record.id).map { it.id }
             ui.onNodeWithText("重新排序").performTouchInput { click() }
             val first = ui.onNodeWithContentDescription("重新排序 1").fetchSemanticsNode().boundsInRoot.center
@@ -146,11 +149,13 @@ class HistoryRescanE2eTest {
     @Test fun failedAutoSaveKeepsOriginalAndRetryUpdatesSameRecord() {
         val record = seed()
         val blocked = File(instrumentation.targetContext.filesDir, "history/records.json.new")
+        var ownsBlocker = false
         try {
             ready()
-            open(record.title)
+            open(record.id)
             val previousPdf = File(record.filePath).readBytes()
-            check(blocked.mkdir())
+            ownsBlocker = blocked.mkdir()
+            check(ownsBlocker)
             File(blocked, "blocked").writeText("simulate index write failure")
             ui.onNodeWithText("旋转").performTouchInput { click() }
             ui.waitUntil(60_000) { ui.onAllNodesWithText("文档未保存").fetchSemanticsNodes().isNotEmpty() }
@@ -158,13 +163,52 @@ class HistoryRescanE2eTest {
             assertEquals(record, repository.loadRecords().first { it.id == record.id })
             evidence("save-failed-original-retained")
             check(blocked.deleteRecursively())
+            ownsBlocker = false
             ui.onNodeWithText("重试").performClick()
             ui.waitUntil(60_000) { repository.loadRecords().first { it.id == record.id }.updatedAtMillis > record.updatedAtMillis }
             assertEquals(1, repository.loadRecords().count { it.id == record.id })
             assertEquals(90f, repository.loadDocumentPages(record.id)[0].rotationDegrees)
             evidence("retry-same-record-saved")
         } finally {
-            blocked.deleteRecursively()
+            if (ownsBlocker) blocked.deleteRecursively()
+            repository.deleteRecord(record.id)
+        }
+    }
+
+    @Test fun missingTemporaryPagesAreReprocessedOnRetryWithoutLosingOriginal() {
+        val record = seed()
+        val started = System.currentTimeMillis()
+        val blocked = File(instrumentation.targetContext.filesDir, "history/records.json.new")
+        var ownsBlocker = false
+        try {
+            ready()
+            open(record.id)
+            ui.onNodeWithText("添加").performTouchInput { click() }
+            enterCameraWhenReady(ui)
+            for (count in 4..5) {
+                ui.onNodeWithContentDescription("拍摄").performClick()
+                ui.waitUntil(30_000) { ui.onAllNodesWithText(count.toString()).fetchSemanticsNodes().isNotEmpty() }
+            }
+            ownsBlocker = blocked.mkdir()
+            check(ownsBlocker)
+            File(blocked, "blocked").writeText("simulate failed index commit")
+            ui.onNodeWithContentDescription("已拍页面预览").performClick()
+            ui.waitUntil(90_000) { ui.onAllNodesWithText("文档未保存").fetchSemanticsNodes().isNotEmpty() }
+            assertEquals(3, repository.loadRecords().first { it.id == record.id }.pageCount)
+            val cache = File(instrumentation.targetContext.cacheDir, "document-page-processing")
+            val temporary = cache.listFiles().orEmpty().filter { it.isFile && it.lastModified() >= started }
+            assertTrue("Captured pages must be staged on disk", temporary.isNotEmpty())
+            temporary.forEach { check(it.delete()) }
+            check(blocked.deleteRecursively())
+            ownsBlocker = false
+            ui.onNodeWithText("重试").performClick()
+            ui.waitUntil(90_000) { repository.loadRecords().any { it.id == record.id && it.pageCount == 5 } }
+            ui.waitUntil(30_000) { ui.onAllNodesWithText("正在", substring = true).fetchSemanticsNodes().isEmpty() }
+            assertEquals(1, repository.loadRecords().count { it.id == record.id })
+            assertTrue(cache.listFiles().orEmpty().none { it.lastModified() >= started })
+            evidence("missing-cache-rebuilt-same-document")
+        } finally {
+            if (ownsBlocker) blocked.deleteRecursively()
             repository.deleteRecord(record.id)
         }
     }
