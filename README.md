@@ -1,181 +1,121 @@
 <div align="center">
-<img src="docs/images/logo.png" width="120" height="auto" alt="JuZiScan Logo">
 
-# 桔子扫描 (JuZiScan) 🍊
+<img src="app/src/main/res/drawable-nodpi/firefly_logo_badge.png" width="104" alt="萤火Scan Logo" />
 
-**商业级开源智能文档扫描、OCR 文字识别与 PDF/图像工具箱 Android 应用**
+# 萤火Scan · Firefly Scan
 
-[![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
-[![Android](https://img.shields.io/badge/Android-Jetpack%20Compose-3DDC84.svg?logo=android)](app)
-[![Kotlin](https://img.shields.io/badge/Kotlin-1.9+-7F52FF.svg?logo=kotlin)](https://kotlinlang.org/)
-[![Alipay](https://img.shields.io/badge/Payment-支付宝App支付闭环-1677FF.svg?logo=alipay)](#-商业变现与支付闭环)
-[![Local-First](https://img.shields.io/badge/Privacy-100%25%20Local--First-purple.svg)](#-核心特性)
-[![Verified](https://img.shields.io/badge/AppStore-商用验证-orange.svg)](#-核心技术专题ai-深度学习--opencv-双引擎文档边缘检测与透视矫正)
+**萤火微光 · 为你点亮**
 
-<p align="center">
-<a href="#-界面预览">界面预览</a> •
-<a href="#-核心特性">核心特性</a> •
-<a href="#-核心技术专题ai-深度学习--opencv-双引擎文档边缘检测与透视矫正">核心切边算法</a> •
-<a href="#-商业变现与支付闭环">支付闭环</a> •
-<a href="#-小白上手3-步运行客户端">快速开始</a> •
-<a href="#-apk-一键打包">APK 打包</a> •
-<a href="#-联系作者与交流">联系作者</a>
-</p>
+Android 文档扫描与处理应用：从拍摄、校正、增强，到整理与导出。
 
-**桔子扫描 (JuZiScan)** 是一款专为高效办公与个人隐私打造的 **商业级智能文档扫描与全栈 Android 应用**。
+[![Android](https://img.shields.io/badge/Android-8.0%2B-3DDC84?logo=android)](app)
+[![Kotlin](https://img.shields.io/badge/Kotlin-Jetpack%20Compose-7F52FF?logo=kotlin)](app)
+[![License](https://img.shields.io/badge/License-MIT-2E8B75)](LICENSE)
 
-内置经商用验证的 **AI深度学习+OpenCV双引擎算法**，杂乱背景与反光场景下依然毫米级精准贴合。  
-**100%本地运行杜绝隐私泄露** • 内置**支付宝支付与VIP订阅闭环**拿来即用
+[功能介绍](#功能介绍) · [界面预览](#界面预览) · [快速开始](#快速开始) · [技术架构](#技术架构) · [开发文档](#开发文档)
+
 </div>
 
----
+## 项目简介
 
-## 📱 界面预览
+**萤火Scan** 以文件扫描为核心，提供文档边缘检测、透视矫正、图像风格处理、多页管理、文字识别和 PDF/图片导出等功能。日常扫描和图像处理主要在 Android 设备本地完成；账号、会员与支付相关功能由可选的后端服务支持。
+
+本仓库基于 [JuZiScan](https://github.com/ucmao/juziscan) 持续开发，已完成**萤火Scan 品牌主题与新版首页**；其他功能页面将依照 [产品视觉规范](design.md) 逐步统一。
+
+## 界面预览
 
 <div align="center">
 
-| 首页 | 证件扫描 | 文档扫描 | 畸形矫正 | 会员中心 |
-| :---: | :---: | :---: | :---: | :---: |
-| <img src="docs/images/screenshot_1.jpg" width="160" alt="首页" /> | <img src="docs/images/screenshot_2.jpg" width="160" alt="证件扫描" /> | <img src="docs/images/screenshot_3.jpg" width="160" alt="文档扫描" /> | <img src="docs/images/screenshot_4.jpg" width="160" alt="畸形矫正" /> | <img src="docs/images/screenshot_5.jpg" width="160" alt="会员中心" /> |
+| 首页 | 文件扫描主入口 | 我的 |
+| :---: | :---: | :---: |
+| <img src="docs/visual-pass2/pass2_home.png" width="245" alt="萤火Scan 首页" /> | <img src="docs/visual-pass2/pass2_card.png" width="245" alt="文件扫描主卡片" /> | <img src="docs/visual-pass2/pass2_mine.png" width="245" alt="我的页面" /> |
+
+<sub>截图来自品牌改版第二轮的实际界面验证。</sub>
 
 </div>
 
----
+## 功能介绍
 
-## ✨ 核心特性
+| 功能 | 当前能力 |
+| --- | --- |
+| **文件扫描** | 基于 CameraX 拍摄或从相册导入，支持智能手拍、自动拍、连续扫描与文档边缘检测 |
+| **文档校正** | 自动检测边缘、手动调整四角，进行裁剪与透视矫正 |
+| **五种图像风格** | 原图、彩色增强、白纸增强、灰度、黑白文档；可设置默认风格，并逐页修改 |
+| **多页文档管理** | 预览、旋转、重排、删除、历史记录与续扫；扫描过程中逐步保存 |
+| **导出与分享** | PDF、JPG、PNG、TIFF、HEIF；支持不同文件质量、分享及水印配置 |
+| **识别功能** | 基于 ML Kit 的中文 OCR、证件扫描与表格识别入口 |
+| **常用工具** | 图片转 PDF、长图拼接、图片压缩、二维码工具、Wi-Fi 传图 |
+| **账号与会员** | 可对接 FastAPI 后端，支持登录、会员状态与支付宝相关流程 |
 
-- **智能扫描**：实时捕捉纸张边缘并自动完成透视矫正，内置去阴影、黑白文档、高清增强等多款专业图像滤镜。
-- **智能手拍与自动拍**：文件扫描默认实时识别四角、手动点击快门，拍后可连续扫描；也可切换自动拍。点击已拍缩略图统一预览、调整边缘和导出多页文档。
-- **离线OCR**：内置端侧 MLKit 引擎秒级离线提取文本，支持高精度智能段落排版、一键快速复制与多格式导出。
-- **证件拼版**：支持身份证、银行卡、驾驶证等常用证件正反面 1:1 智能 A4 拼版，自带防盗用自定义安全水印。
-- **实用工具**：集成长图无缝拼接、图片批量转 PDF、智能无损图片压缩、多格式二维码生成与识别等高频工具箱。
-- **支付闭环**：开箱支持支付宝 App 唤起支付、服务端异步验签回调、VIP 订单自动履约与会员特权秒级下发。
-- **隐私安全**：核心图像处理与文本识别 100% 在手机端侧芯片本地完成，零数据强制上云，彻底杜绝隐私泄露。
+### 五种文档图像风格
 
----
+针对日常文档、发黄纸张、票据和黑白文字等场景，提供不同处理风格。图像处理基于 OpenCV，与现有扫描和导出流程衔接。
 
-## 🎯 核心技术专题：AI深度学习+OpenCV双引擎文档边缘检测与透视矫正
+![五种图像风格对比](docs/images/issue-3/62979813-8e32-4866-89c0-3a58c29014ed-comparison.jpg)
 
-> 💡 **本项目核心价值亮点**：很多开源扫描项目仅采用简单的 OpenCV Canny 算子，在复杂背景、弯曲反光、杂物干扰下切边极易失败。本项目经过**真实商业应用市场上架验证**，采用 **AI 热力图定位 + OpenCV 传统视觉** 双保险机制，保证了极高的贴合度与稳定性。
+<sub>从左至右：原图、彩色增强、白纸增强、灰度、黑白文档。样例为测试图片。</sub>
 
-```mermaid
-flowchart LR
-    Input["📸 图像输入 / 实时相机帧"] --> AI_Engine["🧠 AI 神经网络引擎 (ONNX 热力图)"]
-    AI_Engine -- "置信度达标 (首选)" --> Quad["🎯 四角顶角坐标定位"]
-    AI_Engine -- "低光照/极端情况自动降级" --> OpenCV_Engine["⚙️ OpenCV 传统视觉算子"]
-    OpenCV_Engine --> Quad
-    Quad --> Warp["📐 透视拉伸矫正 (WarpPerspective)"]
-    Warp --> Filter["🎨 智能去阴影 & 增强滤镜"]
+实现说明和验证记录：[文件扫描图片处理 v1](docs/issue-3-document-styles.md)。
+
+## 技术架构
+
+| 模块 | 主要技术 |
+| --- | --- |
+| Android 客户端 | Kotlin、Jetpack Compose、Material 3 |
+| 拍摄与文档处理 | CameraX、ONNX Runtime、OpenCV |
+| 中文 OCR | Google ML Kit |
+| 二维码 | ZXing |
+| 可选后端 | Python、FastAPI、SQLite / PostgreSQL |
+| 会员与支付 | Android 支付宝 SDK、后端订单与支付接口 |
+
+扫描、图像处理和文档管理以客户端为核心；使用账号、会员或支付功能时，需要相应的后端配置。
+
+## 快速开始
+
+### 环境要求
+
+- Android Studio、JDK 17、项目 Gradle 配置所需 Android SDK
+- Android 8.0（API 26）及以上设备或模拟器
+
+### 获取代码
+
+```bash
+git clone https://github.com/bronya19c818/firefly-scan.git
+cd firefly-scan
 ```
 
-### 1. 第一优先：ONNX 深度学习热力图定位 (`docaligner_heatmap.onnx`)
-- **端侧超轻模型**：仅 13MB 深度卷积神经网络，专为手机 CPU/GPU 实时推断优化，毫秒级响应。
-- **热力图峰值算法**：模型输出 4 通道关键点热力图，精准锁定左上、右上、右下、左下 4 个顶点。即便在**背景杂乱、纸张弯曲、阴影遮挡**下依然精准识别。
+使用 Android Studio 打开仓库根目录，等待 Gradle 同步，再运行 **app**。
 
-### 2. 第二兜底：OpenCV 传统计算机视觉降级保护
-- 当光线极暗或对比度极低、AI 热力图置信度不足时，系统自动无缝切换为 OpenCV 轮廓提取流水线（高斯降噪 $\rightarrow$ 自适应阈值 $\rightarrow$ 最大多边形逼近），确保 100% 稳定的切边体验。
+Windows PowerShell 构建 Debug APK：
 
-### 3. 矩阵透视矫正与去阴影滤镜
-- 计算单应性矩阵（Homography Matrix）进行透视平整拉伸，配合自适应局部去阴影算法，输出媲美物理扫描仪的清晰文档。
-
----
-
-## 💰 商业变现与支付闭环
-
-JuZiScan 提供了一套**开箱即用的完整商业化变现方案**，无需从零对接复杂的支付流程：
-
-```mermaid
-sequenceDiagram
-    autonumber
-    actor User as 用户
-    participant App as Android 客户端
-    participant Server as FastAPI 后端
-    participant Alipay as 支付宝开放平台
-
-    User->>App: 选购 VIP 套餐并点击购买
-    App->>Server: 发起创建订单请求 (套餐 ID + 用户 Token)
-    Server->>Alipay: 调用预下单接口生成签名订单串 (OrderStr)
-    Server-->>App: 返回支付宝唤起签名串
-    App->>Alipay: 调起支付宝 App 支付收银台
-    User->>Alipay: 完成支付确认
-    Alipay-->>App: 同步返回支付成功结果
-    Alipay->>Server: 发送官方异步支付结果通知 (Notify Webhook)
-    Server->>Server: 验签成功并更新订单状态，自动充值/激活 VIP
-    App->>Server: 刷新用户状态，即时解锁全部 VIP 特权
+```powershell
+.\gradlew.bat :app:assembleDebug
 ```
 
-- **全流程打通**：包含手机号验证码/密码登录、VIP 套餐订阅、支付宝唤端支付、服务端异步回调入账及状态同步。
-- **开箱即用后台**：配套纯原生轻量 Web 控制台，实时查看订单流水、用户 VIP 状态及版本更新发布。
+macOS / Linux：
 
----
+```bash
+./gradlew :app:assembleDebug
+```
 
-## 🚀 小白上手：3 步运行客户端
+构建结果位于 `app/build/outputs/apk/debug/`。正式发布需自行配置 APK 签名。
 
-本项目为**本地优先（Local-First）**架构，**运行 App 完全不需要部署后端**，克隆后打开即可体验全部扫描核心功能！
+### 可选后端
 
-### 准备环境
-- 安装 [Android Studio](https://developer.android.com/studio) (推荐 Jellyfish 或更新版本)
-- JDK 17 或以上
+本地文件扫描和图片处理不依赖后端。若需要登录、会员或支付功能，参阅 [后端部署指南](backend/README.md)。
 
-### 快速跑起来
-1. **克隆项目到本地**：
-   ```bash
-   git clone https://github.com/ucmao/juziscan.git
-   ```
-2. **打开项目**：启动 Android Studio，点击 **Open**，选择 `juziscan` 根目录，等待 Gradle 依赖加载完成。
-3. **一键运行**：手机开启“USB 调试”连接电脑（或启动模拟器），点击顶部绿色 **Run 'app'** (▶️) 按钮，即可在手机上体验！
+Android 模拟器调试时，可通过 `JUZISCAN_API_BASE_URL` 配置接口根地址，例如 `http://10.0.2.2:18001`。此字段名沿用当前代码，客户端会自行追加 API 路径，详见 [BACKEND.md](BACKEND.md)。
 
----
+## 开发文档
 
-## 📦 APK 一键打包
+- [产品视觉设计规范](design.md)：品牌、配色、首页和后续页面的设计基线
+- [五种图像风格与验证记录](docs/issue-3-document-styles.md)：处理规则、保存机制、测试样张及结果
+- [后端配置与部署](backend/README.md)：账号、数据库及支付服务
 
-如果你想将 App 打包成安装包发送给他人体验：
+项目持续迭代中：新版品牌首页已完成，扫描、预览、编辑、导出、工具及设置等页面将继续统一视觉样式。问题与改进需求可通过 [GitHub Issues](https://github.com/bronya19c818/firefly-scan/issues) 提交。
 
-- **方式一（命令行）**：
-  ```bash
-  # macOS / Linux
-  ./gradlew assembleRelease
+## 开源许可与致谢
 
-  # Windows
-  gradlew.bat assembleRelease
-  ```
-  导出的 APK 路径：`app/build/outputs/apk/release/`
+本项目基于 [ucmao/JuZiScan](https://github.com/ucmao/juziscan) 继续开发，感谢原作者及相关开源组件维护者。
 
-- **方式二（Android Studio 菜单）**：  
-  点击顶部菜单 **Build** $\rightarrow$ **Generate Signed Bundle / APK** $\rightarrow$ 选择 **APK** 打包即可。
-
----
-
-## ⚙️ 可选进阶：后端服务与管理后台
-
-> 📌 **注**：App 的扫描、矫正、OCR、工具箱等本地功能完全独立运行。仅当需要体验**用户登录、支付宝支付闭环、Web 管理后台**时才需启动后端。
-
-1. **启动后端（极简 SQLite 零配置）**：
-   ```bash
-   cd backend
-   python3 -m venv .venv
-   source .venv/bin/activate       # Windows 使用 .venv\Scripts\activate
-   pip install -r requirements.txt
-   cp .env.example .env
-   uvicorn app.main:app --reload --host 0.0.0.0 --port 18001
-   ```
-2. **访问后台控制台**：浏览器打开 `http://127.0.0.1:18001`（默认账号：`admin` / 密码：`admin123`）。
-3. 详细配置请参阅 👉 [后端独立指南 (`backend/README.md`)](backend/README.md)。
-
----
-
-## 📬 联系作者与交流
-
-如果您在体验、二开或商用接入过程中遇到问题，欢迎交流：
-
-- **微信**：csdnxr
-- **QQ**：294323976
-- **邮箱**：[leoucmao@gmail.com](mailto:leoucmao@gmail.com)
-- **GitHub Issues**：[提交问题与建议](https://github.com/ucmao/juziscan/issues)
-
----
-
-## 📄 开源协议与免责声明
-
-- **开源协议**：本项目基于 [MIT License](LICENSE) 协议开源。无论个人学习还是商业用途，均可**免费使用、修改和分发**，但请保留原作者版权声明。
-- **免责声明**：本项目代码及内置模型仅供技术学习、研究与合法商业参考。使用者在引入商业生产环境时，应自行评估网络安全、数据隐私及支付业务合规性，作者不对因使用本软件造成的任何直接或间接损失承担责任。
+仓库遵循 [MIT License](LICENSE)，使用、修改与分发时须保留适用的版权和许可声明。
