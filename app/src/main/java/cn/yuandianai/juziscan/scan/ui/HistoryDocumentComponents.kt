@@ -33,6 +33,7 @@ import cn.yuandianai.juziscan.common.ShareUploadIcon
 import cn.yuandianai.juziscan.common.TrashBinIcon
 import cn.yuandianai.juziscan.history.HistoryRecord
 import cn.yuandianai.juziscan.history.HistoryRecordKind
+import cn.yuandianai.juziscan.ui.theme.FireflyColors
 import cn.yuandianai.juziscan.ui.theme.HpSmartColors
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -69,7 +70,7 @@ fun HistoryRecordCard(
                 .aspectRatio(if (compact) 1.0f else 0.88f)
                 .background(
                     Brush.linearGradient(
-                        listOf(Color(0xFFEAF2FF), Color(0xFFD7E6FF))
+                        listOf(FireflyColors.SurfaceSoft, Color(0xFFD8EFE7))
                     ),
                     RoundedCornerShape(14.dp)
                 ),
@@ -85,7 +86,7 @@ fun HistoryRecordCard(
             } else {
                 Text(
                     text = record.kind.displayLabel(),
-                    color = Color(0xFF4F6EA5),
+                    color = FireflyColors.Primary,
                     fontSize = 14.sp,
                     fontWeight = FontWeight.Bold
                 )
@@ -114,7 +115,7 @@ fun HistoryRecordCard(
             record.textPreview?.takeIf { it.isNotBlank() }?.let { preview ->
                 Text(
                     text = preview.replace('\n', ' '),
-                    color = Color(0xFF6B7C9E),
+                    color = FireflyColors.SecondaryText,
                     fontSize = 12.sp,
                     maxLines = if (compact) 1 else 2,
                     overflow = TextOverflow.Ellipsis
@@ -127,7 +128,7 @@ fun HistoryRecordCard(
             ) {
                 Text(
                     text = formatHistoryTime(record.updatedAtMillis),
-                    color = Color(0xFF97A7C1),
+                    color = FireflyColors.SecondaryText.copy(alpha = 0.8f),
                     fontSize = 12.sp,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
@@ -141,14 +142,14 @@ fun HistoryRecordCard(
                         text = "分享",
                         onClick = { onShare(record) }
                     ) {
-                        ShareUploadIcon(color = Color(0xFF0B63FF), modifier = Modifier.size(15.dp))
+                        ShareUploadIcon(color = FireflyColors.Primary, modifier = Modifier.size(15.dp))
                     }
                     if (onDelete != null) {
                         SmallHistoryAction(
                             text = "删除",
                             onClick = { onDelete(record) }
                         ) {
-                            TrashBinIcon(color = Color(0xFFF35B5B), modifier = Modifier.size(15.dp))
+                            TrashBinIcon(color = FireflyColors.Error, modifier = Modifier.size(15.dp))
                         }
                     }
                 }
@@ -171,7 +172,7 @@ fun EmptyHistoryState(
     ) {
         Text(
             text = text,
-            color = Color(0xFF91A1BD),
+            color = FireflyColors.SecondaryText,
             fontSize = 14.sp
         )
     }
@@ -185,7 +186,7 @@ private fun SmallHistoryAction(
 ) {
     Row(
         modifier = Modifier
-            .background(Color(0xFFF4F7FD), RoundedCornerShape(999.dp))
+            .background(FireflyColors.SurfaceSoft, RoundedCornerShape(999.dp))
             .padding(horizontal = 8.dp, vertical = 5.dp)
             .pointerInput(text) { detectTapGesturesCompat(onClick) },
         verticalAlignment = Alignment.CenterVertically,

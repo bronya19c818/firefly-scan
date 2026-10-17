@@ -291,7 +291,7 @@ fun ImageCompressToolScreen(onBack: () -> Unit) {
                                 executeShare(
                                     context = context,
                                     pages = listOf(dummyPage),
-                                    fileName = "桔子扫描_图片压缩_${System.currentTimeMillis()}",
+                                    fileName = "萤火Scan_图片压缩_${System.currentTimeMillis()}",
                                     fileType = ExportFileType.JPG,
                                     fileSize = selectedSize
                                 )

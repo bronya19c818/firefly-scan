@@ -20,8 +20,8 @@ import cn.yuandianai.juziscan.scan.LegalDocType
 import cn.yuandianai.juziscan.scan.ScanFlow
 import cn.yuandianai.juziscan.scan.ui.LegalDocumentScreen
 import cn.yuandianai.juziscan.scan.ui.ScanHomeScreen
-import cn.yuandianai.juziscan.ui.theme.HpSmartColors
-import cn.yuandianai.juziscan.ui.theme.JuZiScanTheme
+import cn.yuandianai.juziscan.ui.theme.FireflyColors
+import cn.yuandianai.juziscan.ui.theme.FireflyTheme
 import com.google.mlkit.common.MlKit
 
 private object MlKitInitializer {
@@ -54,7 +54,8 @@ class MainActivity : ComponentActivity() {
             MlKitInitializer.ensureInitialized(applicationContext)
         }
         setContent {
-            JuZiScanTheme(darkTheme = false, dynamicColor = false) {
+            // 深色主题将在后续阶段随各页面改造一并启用，本轮保持浅色（与现网一致）
+            FireflyTheme(darkTheme = false) {
                 var privacyConsentGranted by remember {
                     mutableStateOf(consentStore.hasAcceptedCurrentPolicy())
                 }
@@ -62,7 +63,7 @@ class MainActivity : ComponentActivity() {
 
                 Surface(
                     modifier = Modifier.fillMaxSize(),
-                    color = HpSmartColors.Background
+                    color = FireflyColors.Background
                 ) {
                     val legalDocument = consentLegalDocument
                     if (legalDocument != null) {

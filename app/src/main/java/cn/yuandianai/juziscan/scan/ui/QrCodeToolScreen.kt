@@ -193,7 +193,7 @@ private fun GenerateQrCodeView() {
                                 executeShare(
                                     context = context,
                                     pages = listOf(dummyPage),
-                                    fileName = "桔子扫描_二维码_${System.currentTimeMillis()}",
+                                    fileName = "萤火Scan_二维码_${System.currentTimeMillis()}",
                                     fileType = ExportFileType.PNG,
                                     fileSize = ExportFileSize.Actual
                                 )

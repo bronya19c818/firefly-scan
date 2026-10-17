@@ -49,7 +49,7 @@ fun PrivacyConsentDialog(
         onDismissRequest = {},
         title = {
             Text(
-                text = "欢迎使用桔子扫描",
+                text = "欢迎使用萤火Scan",
                 color = HpSmartColors.TextPrimary,
                 fontWeight = FontWeight.Bold,
                 fontSize = 18.sp
