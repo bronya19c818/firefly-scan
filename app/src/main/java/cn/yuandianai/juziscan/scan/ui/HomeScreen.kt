@@ -405,6 +405,7 @@ private fun ScanCameraGlyph(color: Color, modifier: Modifier = Modifier) {
 private data class QuickEntrySpec(
     val label: String,
     val chipColor: Color,
+    val glyphColor: Color,
     val onClick: () -> Unit,
     val glyph: @Composable (Color, Modifier) -> Unit
 )
@@ -416,17 +417,19 @@ private fun QuickEntryRow(
     onMoreToolsClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    // 色彩全部取自 design.md 3.1 品牌色板：深湖青系 + 薄荷青 + 次要墨青
     val entries = listOf(
-        QuickEntrySpec("证件扫描", FireflyColors.EntryBlue, { onEntryClick(ScanEntry.IdCard) }) { c, m ->
+        QuickEntrySpec("证件扫描", FireflyColors.Primary, Color.White, { onEntryClick(ScanEntry.IdCard) }) { c, m ->
             IdCardGlyph(c, m)
         },
-        QuickEntrySpec("文字识别", FireflyColors.EntryTeal, { onEntryClick(ScanEntry.Ocr) }) { c, m ->
+        QuickEntrySpec("文字识别", FireflyColors.PrimaryLight, Color.White, { onEntryClick(ScanEntry.Ocr) }) { c, m ->
             TextScanGlyph(c, m)
         },
-        QuickEntrySpec("相册导入", FireflyColors.EntryPurple, onImportClick) { c, m ->
+        // 薄荷青底配白色线条
+        QuickEntrySpec("相册导入", FireflyColors.Mint, Color.White, onImportClick) { c, m ->
             GalleryGlyph(c, m)
         },
-        QuickEntrySpec("更多工具", FireflyColors.EntrySlate, onMoreToolsClick) { c, m ->
+        QuickEntrySpec("更多工具", FireflyColors.SecondaryText, Color.White, onMoreToolsClick) { c, m ->
             GridGlyph(c, m)
         }
     )
@@ -457,7 +460,7 @@ private fun QuickEntryRow(
                             .background(entry.chipColor, RoundedCornerShape(12.dp)),
                         contentAlignment = Alignment.Center
                     ) {
-                        entry.glyph(Color.White, Modifier.size(22.dp))
+                        entry.glyph(entry.glyphColor, Modifier.size(22.dp))
                     }
                 }
                 Text(
