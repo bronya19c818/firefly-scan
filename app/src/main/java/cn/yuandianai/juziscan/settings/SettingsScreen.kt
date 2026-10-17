@@ -24,12 +24,19 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import cn.yuandianai.juziscan.scan.DocumentImageStyle
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.RadioButton
+import androidx.compose.runtime.*
 import cn.yuandianai.juziscan.scan.LegalDocType
 import cn.yuandianai.juziscan.ui.theme.HpSmartColors
 
 @Composable
 fun SettingsScreen(
     scanQuality: String,
+    defaultImageStyle: DocumentImageStyle,
+    onDefaultImageStyleChange: (DocumentImageStyle) -> Unit,
     defaultExportFormat: String,
     cacheSize: String,
     appVersion: String,
@@ -40,6 +47,19 @@ fun SettingsScreen(
     onPermissionClick: () -> Unit,
     onLegalDocClick: (LegalDocType) -> Unit
 ) {
+    var showStyles by remember { mutableStateOf(false) }
+    if (showStyles) AlertDialog(
+        onDismissRequest = { showStyles = false }, title = { Text("默认图片处理风格") },
+        text = { Column { DocumentImageStyle.entries.forEach { style ->
+            Row(Modifier.fillMaxWidth().clickable { onDefaultImageStyleChange(style); showStyles = false },
+                verticalAlignment = Alignment.CenterVertically) {
+                RadioButton(selected = defaultImageStyle == style,
+                    onClick = { onDefaultImageStyleChange(style); showStyles = false })
+                Text(style.label)
+            }
+        } } },
+        confirmButton = { TextButton(onClick = { showStyles = false }) { Text("取消") } }
+    )
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -64,6 +84,8 @@ fun SettingsScreen(
 
         SectionTitle("扫描与导出")
         SettingsCard {
+            SettingRow("默认图片处理风格", defaultImageStyle.label, { showStyles = true })
+            Divider()
             SettingRow("扫描保存质量", scanQuality, onScanQualityClick)
             Divider()
             SettingRow("默认导出格式", defaultExportFormat, onDefaultExportFormatClick)

@@ -89,6 +89,7 @@ import cn.yuandianai.juziscan.scan.ui.AuthDialog
 import cn.yuandianai.juziscan.scan.ui.BindPhoneDialog
 import cn.yuandianai.juziscan.scan.ui.FeedbackDialog
 import cn.yuandianai.juziscan.scan.ui.CameraCaptureScreen
+import cn.yuandianai.juziscan.scan.ui.DocumentStyleScreen
 import cn.yuandianai.juziscan.scan.ui.EdgeReviewScreen
 import cn.yuandianai.juziscan.scan.ui.IdCardResultScreen
 import cn.yuandianai.juziscan.scan.ui.NicknameEditDialog
@@ -392,6 +393,10 @@ private fun ScannerFlowScreen(
     var defaultExportFormat by remember {
         mutableStateOf(settingsPrefs.getString("default_export_format", "PDF") ?: "PDF")
     }
+    var defaultImageStyle by remember {
+        mutableStateOf(DocumentImageStyle.parse(settingsPrefs.getString(DocumentImageStyle.PREFERENCE_KEY, "color")))
+    }
+    var editingImageStyle by remember { mutableStateOf(DocumentImageStyle.Color) }
     fun cacheBytes(): Long = context.cacheDir.walkTopDown().filter { it.isFile }.sumOf { it.length() }
     fun formatCacheSize(bytes: Long): String = when {
         bytes < 1024 -> "${bytes} B"
@@ -693,6 +698,7 @@ private fun ScannerFlowScreen(
             val owner = currentDocumentRecordId
             val session = documentUiSession
             editingDocumentPage = page
+            editingImageStyle = DocumentImageStyle.parse(page.imageStyle)
             val showEditor: (ScannedPage) -> Unit = { editingPage ->
                 sourceBitmap = editingPage.sourceBitmap
                 reviewBitmap = editingPage.reviewBitmap
@@ -707,7 +713,10 @@ private fun ScannerFlowScreen(
             scope.launch {
                 runCatching {
                     withContext(Dispatchers.Default) {
-                        val hydrated = hydratePageForEditing(page)
+                        val hydrated = page.sourceImagePath?.let { path ->
+                            val bitmap = requireNotNull(decodeBitmapFromFileBounded(path, 1600)) { "无法读取页面原图" }
+                            page.copy(sourceBitmap = bitmap, reviewBitmap = bitmap, processedBitmap = null)
+                        } ?: hydratePageForEditing(page)
                         val prepared = if (hydrated.editableQuad.isEmpty() && hydrated.detectedQuad.isEmpty()) {
                             hydrated.copy(detectedQuad = SimpleDocumentScanner.detectDocumentQuad(context,
                                 hydrated.reviewBitmap ?: hydrated.sourceBitmap).orEmpty())
@@ -1037,6 +1046,7 @@ private fun ScannerFlowScreen(
             if (!lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) return
             if (!tryBeginCapture()) return
             val taskAtCapture = currentTask
+            val styleAtCapture = defaultImageStyle.id
             if (taskAtCapture == CaptureTask.Document) {
                 val documentId = ensureDocumentId()
                 val capturedPages = pages.toList()
@@ -1053,7 +1063,8 @@ private fun ScannerFlowScreen(
                                     check(file.length() > 0) { "原图保存失败" }
                                     val thumbnail = requireNotNull(decodeBitmapFromFileBounded(file.path, 640))
                                     val page = ScannedPage(id = pageId, contentRevision = revision,
-                                        sourceBitmap = thumbnail, previewBitmap = thumbnail, sourceImagePath = file.path)
+                                        sourceBitmap = thumbnail, previewBitmap = thumbnail, sourceImagePath = file.path,
+                                        imageStyle = styleAtCapture)
                                     val saved = documentSaver.addPages(documentId, listOf(page),
                                         replacement?.let { capturedPages.getOrNull(it)?.id })
                                     val persisted = saved.pages
@@ -1168,6 +1179,7 @@ private fun ScannerFlowScreen(
         ) { uris ->
             if (uris.isEmpty()) return@rememberLauncherForActivityResult
             val taskAtImport = currentTask
+            val styleAtImport = defaultImageStyle.id
             val importId = if (taskAtImport == CaptureTask.Document) ensureDocumentId() else null
             val importSession = documentUiSession
             val existingPages = pages.toList()
@@ -1195,7 +1207,7 @@ private fun ScannerFlowScreen(
                         val incoming = results.mapIndexed { index, (_, bitmap) -> ScannedPage(
                             id = if (index == 0) replacement?.let { existingPages.getOrNull(it)?.id }
                                 ?: java.util.UUID.randomUUID().toString() else java.util.UUID.randomUUID().toString(),
-                            sourceBitmap = bitmap, previewBitmap = preparePreviewBitmap(bitmap, 640)) }
+                            sourceBitmap = bitmap, previewBitmap = preparePreviewBitmap(bitmap, 640), imageStyle = styleAtImport) }
                         scope.launch {
                             try {
                                 val restored = withContext(NonCancellable + Dispatchers.IO) {
@@ -1355,7 +1367,7 @@ private fun ScannerFlowScreen(
         }
 
         BackHandler(enabled = isProcessingPreview || (currentTask == CaptureTask.Document && stage in listOf(
-            ScanStage.Preview, ScanStage.Capture, ScanStage.EdgeReview, ScanStage.Reorder, ScanStage.ShareSave
+            ScanStage.Preview, ScanStage.Capture, ScanStage.EdgeReview, ScanStage.ImageProcessing, ScanStage.Reorder, ScanStage.ShareSave
         ))) {
             if (stage == ScanStage.Preview || !isProcessingPreview) {
                 when (stage) {
@@ -1364,6 +1376,7 @@ private fun ScannerFlowScreen(
                         replacingIndex = null
                         if (pages.isNotEmpty()) openPreviewAt(activeIndex) else finishDocument()
                     }
+                    ScanStage.ImageProcessing -> stage = ScanStage.EdgeReview
                     ScanStage.EdgeReview -> {
                         clearEditorAfterUse()
                         stage = if (replacingIndex != null) ScanStage.Preview else ScanStage.Capture
@@ -1487,6 +1500,11 @@ private fun ScannerFlowScreen(
                 ScanStage.Settings -> {
                     SettingsScreen(
                         scanQuality = scanQuality,
+                        defaultImageStyle = defaultImageStyle,
+                        onDefaultImageStyleChange = { style ->
+                            defaultImageStyle = style
+                            settingsPrefs.edit().putString(DocumentImageStyle.PREFERENCE_KEY, style.id).apply()
+                        },
                         defaultExportFormat = defaultExportFormat,
                         cacheSize = cacheSize,
                         appVersion = BuildConfig.VERSION_NAME,
@@ -1686,6 +1704,30 @@ private fun ScannerFlowScreen(
                     }
                 }
 
+                ScanStage.ImageProcessing -> {
+                    val original = editingDocumentPage
+                    val bitmap = reviewBitmap
+                    if (original != null && bitmap != null) {
+                        DocumentStyleScreen(bitmap, editableQuad, correctionMode, editingImageStyle,
+                            onSelected = { editingImageStyle = it },
+                            onBack = { stage = ScanStage.EdgeReview },
+                            onDone = {
+                                var quad = editableQuad.map { PointF(it.x, it.y) }
+                                val turns = (normalizePageRotation(original.rotationDegrees) / 90f).toInt()
+                                repeat((4 - turns) % 4) { quad = rotateQuadClockwise(quad) }
+                                val edited = original.copy(editableQuad = quad, correctionMode = correctionMode,
+                                    imageStyle = editingImageStyle.id, processedImagePath = null,
+                                    processedBitmap = null, previewBitmap = null)
+                                if (commitPageEdits(pages.map { if (it.id == original.id) edited else it })) {
+                                    replacingIndex = null
+                                    editingDocumentPage = null
+                                    clearEditorAfterUse()
+                                    stage = ScanStage.Preview
+                                }
+                            })
+                    }
+                }
+
                 ScanStage.EdgeReview -> {
                     val originalBitmap = sourceBitmap
                     val reviewBmp = reviewBitmap
@@ -1716,23 +1758,9 @@ private fun ScannerFlowScreen(
                             },
                             onNext = {
                                 if (isProcessingPreview) return@EdgeReviewScreen
-                                if (currentTask == CaptureTask.Document) {
-                                    val original = editingDocumentPage
-                                    if (original != null) {
-                                        var quad = editableQuad.map { PointF(it.x, it.y) }
-                                        val turns = (normalizePageRotation(original.rotationDegrees) / 90f).toInt()
-                                        repeat((4 - turns) % 4) { quad = rotateQuadClockwise(quad) }
-                                        val edited = original.copy(editableQuad = quad, correctionMode = correctionMode,
-                                            processedImagePath = null, processedBitmap = null)
-                                        val updated = pages.map { if (it.id == original.id) edited else it }
-                                        if (commitPageEdits(updated)) {
-                                            replacingIndex = null
-                                            editingDocumentPage = null
-                                            clearEditorAfterUse()
-                                            stage = ScanStage.Preview
-                                        }
-                                        return@EdgeReviewScreen
-                                    }
+                                if (currentTask == CaptureTask.Document && editingDocumentPage != null) {
+                                    stage = ScanStage.ImageProcessing
+                                    return@EdgeReviewScreen
                                 }
                                 isProcessingPreview = true
                                 processingMessage = "正在处理…"

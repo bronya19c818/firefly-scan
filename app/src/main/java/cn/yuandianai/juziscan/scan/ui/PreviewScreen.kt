@@ -145,7 +145,7 @@ fun PreviewResultScreen(
                 // 直到新图解码完成再替换，避免瞬间空白。
                 var shownPageId by remember { mutableStateOf<String?>(null) }
                 val displayBitmap by produceState<Bitmap?>(
-                    null, page.id, page.contentRevision, page.processedImagePath,
+                    null, page.id, page.contentRevision, page.imageStyle, page.editableQuad, page.correctionMode, page.processedImagePath,
                     page.processedBitmap, page.previewBitmap, isCurrent
                 ) {
                     val switchingPage = shownPageId != null && shownPageId != page.id

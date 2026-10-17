@@ -95,6 +95,8 @@ class ImmediateProcessRestartE2eTest {
         ui.waitUntil(20_000) { ui.onAllNodesWithText("铺满").fetchSemanticsNodes().isNotEmpty() }
         ui.onNodeWithText("铺满").performTouchInput { click() }
         ui.onNodeWithText("下一步").performTouchInput { click() }
+        ui.onNodeWithText("图片处理").assertExists()
+        ui.onNodeWithText("完成").performTouchInput { click() }
         ui.onNodeWithContentDescription("扫描预览 1").performTouchInput { swipeLeft() }
         ui.onNodeWithText("···").performTouchInput { click() }
         ui.onNodeWithText("删除").performTouchInput { click() }
