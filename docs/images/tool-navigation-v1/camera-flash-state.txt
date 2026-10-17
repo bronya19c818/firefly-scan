@@ -1,0 +1,9 @@
+manual-on: torchState=1
+manual-off: torchState=0
+auto-flash: torchState=0
+manual-on-again: torchState=1
+rapid-cycle-on: torchState=1
+background-off: torchState=0
+resume-on: torchState=1
+auto-capture-on: torchState=1
+exit-off: torchState=0

@@ -33,12 +33,13 @@ import kotlinx.coroutines.withContext
 import cn.yuandianai.juziscan.common.FireflyIconName
 
 @Composable
-fun ImageToPdfToolScreen(onBack: () -> Unit) {
+fun ImageToPdfToolScreen(onBack: () -> Unit, openPickerOnEntry: Boolean = false) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
     var sourceBitmaps by remember { mutableStateOf<List<Bitmap>>(emptyList()) }
     var isProcessing by remember { mutableStateOf(false) }
+    var pickerRequest by remember { mutableIntStateOf(0) }
 
     val photoPickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickMultipleVisualMedia()
@@ -48,18 +49,23 @@ fun ImageToPdfToolScreen(onBack: () -> Unit) {
             scope.launch {
                 val loadedBitmaps = withContext(Dispatchers.IO) {
                     uris.mapNotNull { uri ->
-                        loadBitmapFromUri(context, uri)
+                        runCatching { loadBitmapFromUri(context, uri) }.getOrNull()
                     }
                 }
                 
-                if (loadedBitmaps.isEmpty()) {
-                    Toast.makeText(context, "图片加载失败", Toast.LENGTH_SHORT).show()
+                if (loadedBitmaps.size != uris.size) {
+                    Toast.makeText(context, "部分图片无法读取，请重新选择", Toast.LENGTH_SHORT).show()
                 } else {
                     sourceBitmaps = loadedBitmaps
                 }
                 isProcessing = false
+                if (openPickerOnEntry && sourceBitmaps.isEmpty()) pickerRequest++
             }
-        }
+        } else if (openPickerOnEntry && sourceBitmaps.isEmpty()) onBack()
+    }
+
+    LaunchedEffect(pickerRequest) {
+        if (openPickerOnEntry) photoPickerLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
     }
 
     Column(
@@ -71,7 +77,7 @@ fun ImageToPdfToolScreen(onBack: () -> Unit) {
         ToolHeader(title = "图片转 PDF", onBack = onBack)
 
         if (sourceBitmaps.isEmpty() && !isProcessing) {
-            ToolEmptyState(
+            if (!openPickerOnEntry) ToolEmptyState(
                 icon = FireflyIconName.ImageToPdf,
                 title = "图片转 PDF",
                 message = "把多张图片整理成 PDF 文档，方便打印、发送和归档保存。",

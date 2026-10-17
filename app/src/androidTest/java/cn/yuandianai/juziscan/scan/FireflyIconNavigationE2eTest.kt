@@ -29,7 +29,7 @@ class FireflyIconNavigationE2eTest {
 
     private fun evidence(name: String) {
         ui.waitForIdle()
-        val bitmap = if (name == "album-picker") {
+        val bitmap = if (name.contains("picker")) {
             requireNotNull(instrumentation.uiAutomation.takeScreenshot())
         } else {
             ui.onRoot().captureToImage().asAndroidBitmap()
@@ -39,6 +39,19 @@ class FireflyIconNavigationE2eTest {
     }
 
     private fun back() = ui.onNodeWithContentDescription("返回").performTouchInput { click() }
+
+    private fun systemBack() {
+        instrumentation.uiAutomation.performGlobalAction(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_BACK)
+        instrumentation.waitForIdleSync()
+    }
+
+    private fun awaitPicker() {
+        ui.waitUntil(15_000) {
+            val pkg = instrumentation.uiAutomation.rootInActiveWindow?.packageName?.toString().orEmpty()
+            pkg != instrumentation.targetContext.packageName && listOf("photo", "media", "documents").any { pkg.contains(it, ignoreCase = true) }
+        }
+        instrumentation.uiAutomation.waitForIdle(500, 10_000)
+    }
 
     @Test fun homeToolsMineAndCameraKeepTheirRoutes() {
         ready()
@@ -57,6 +70,13 @@ class FireflyIconNavigationE2eTest {
         evidence("tools")
         listOf("添加水印", "长图拼接", "图片转PDF", "图片压缩", "二维码工具", "WiFi传图").forEachIndexed { index, label ->
             ui.onNodeWithText(label).performScrollTo().performTouchInput { click() }
+            if (index < 4) {
+                awaitPicker()
+                evidence("tool-picker-$index")
+                systemBack()
+                ui.onNodeWithText("全部工具").assertExists()
+                return@forEachIndexed
+            }
             ui.onNodeWithText("全部工具").assertDoesNotExist()
             val title = when (label) {
                 "图片转PDF" -> "图片转 PDF"
@@ -66,7 +86,6 @@ class FireflyIconNavigationE2eTest {
             assertTrue("Tool page must open: $title", ui.onAllNodesWithText(title).fetchSemanticsNodes().isNotEmpty())
             evidence("tool-$index")
             back()
-            ui.onNodeWithText("更多工具").performTouchInput { click() }
             ui.onNodeWithText("全部工具").assertExists()
         }
         back()
@@ -135,6 +154,85 @@ class FireflyIconNavigationE2eTest {
         assertTrue("Expected Android media picker, got $pickerPackage", listOf("photo", "media", "documents").any { pickerPackage.contains(it, ignoreCase = true) })
         evidence("album-picker")
         instrumentation.uiAutomation.performGlobalAction(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_BACK)
+        ui.onNodeWithText("相册导入").assertExists()
+    }
+
+    @Test fun scanToolsReturnToTheirOwnEntryPage() {
+        ready()
+        fun awaitCamera(label: String) {
+            if (label == "证件扫描") {
+                ui.waitUntil(15_000) { ui.onAllNodesWithText("立即扫描").fetchSemanticsNodes().isNotEmpty() }
+            } else if (label == "文件扫描") enterCameraWhenReady(ui)
+            else ui.waitUntil(15_000) { ui.onAllNodesWithContentDescription("拍摄").fetchSemanticsNodes().isNotEmpty() }
+        }
+        ui.onNodeWithText("更多工具").performTouchInput { click() }
+        listOf("文件扫描", "文字识别", "证件扫描", "表格识别").forEach { label ->
+            ui.onNodeWithText(label).performTouchInput { click() }
+            awaitCamera(label)
+            if (label == "证件扫描") back()
+            else ui.onNodeWithContentDescription("关闭").performTouchInput { click() }
+            ui.onNodeWithText("全部工具").assertExists()
+            ui.onNodeWithText(label).performTouchInput { click() }
+            awaitCamera(label)
+            systemBack()
+            ui.onNodeWithText("全部工具").assertExists()
+        }
+        evidence("tools-returned")
+        back()
+        listOf("文件扫描", "文字识别", "证件扫描").forEach { label ->
+            ui.onNodeWithText(label).performTouchInput { click() }
+            awaitCamera(label)
+            if (label == "证件扫描") back()
+            else ui.onNodeWithContentDescription("关闭").performTouchInput { click() }
+            ui.onNodeWithText("相册导入").assertExists()
+            ui.onNodeWithText(label).performTouchInput { click() }
+            awaitCamera(label)
+            systemBack()
+            ui.onNodeWithText("相册导入").assertExists()
+        }
+        evidence("home-returned")
+    }
+
+    @Test fun flashlightControlsTheBoundCameraAndStopsOnExit() {
+        ready()
+        ui.onNodeWithText("文件扫描").performTouchInput { click() }
+        enterCameraWhenReady(ui)
+        val provider = androidx.camera.lifecycle.ProcessCameraProvider.getInstance(instrumentation.targetContext).get()
+        val info = androidx.camera.core.CameraSelector.DEFAULT_BACK_CAMERA.filter(provider.availableCameraInfos).first()
+        assertTrue("Device must provide rear flash for this hardware check", info.hasFlashUnit())
+        val states = mutableListOf<String>()
+        fun awaitTorch(enabled: Boolean, step: String) {
+            val expected = if (enabled) androidx.camera.core.TorchState.ON else androidx.camera.core.TorchState.OFF
+            ui.waitUntil(15_000) { info.torchState.value == expected }
+            states += "$step: torchState=${info.torchState.value}"
+            File(artifacts, "camera-flash-state.txt").writeText(states.joinToString("\n"))
+        }
+        ui.onNodeWithContentDescription("闪光灯：自动").performTouchInput { click() }
+        awaitTorch(true, "manual-on")
+        evidence("camera-flash-on")
+        ui.onNodeWithContentDescription("闪光灯：开启").performTouchInput { click() }
+        awaitTorch(false, "manual-off")
+        ui.onNodeWithContentDescription("闪光灯：关闭").performTouchInput { click() }
+        awaitTorch(false, "auto-flash")
+        ui.onNodeWithContentDescription("闪光灯：自动").performTouchInput { click() }
+        awaitTorch(true, "manual-on-again")
+        repeat(3) {
+            listOf("闪光灯：开启", "闪光灯：关闭", "闪光灯：自动").forEach { label ->
+                ui.onNodeWithContentDescription(label).performTouchInput { click() }
+            }
+        }
+        awaitTorch(true, "rapid-cycle-on")
+        ui.activityRule.scenario.moveToState(androidx.lifecycle.Lifecycle.State.CREATED)
+        awaitTorch(false, "background-off")
+        ui.activityRule.scenario.moveToState(androidx.lifecycle.Lifecycle.State.RESUMED)
+        enterCameraWhenReady(ui)
+        awaitTorch(true, "resume-on")
+        ui.onNodeWithText("自动拍").performTouchInput { click() }
+        awaitTorch(true, "auto-capture-on")
+        ui.onNodeWithText("智能手拍").performTouchInput { click() }
+        enterCameraWhenReady(ui)
+        ui.onNodeWithContentDescription("关闭").performTouchInput { click() }
+        awaitTorch(false, "exit-off")
         ui.onNodeWithText("相册导入").assertExists()
     }
 }

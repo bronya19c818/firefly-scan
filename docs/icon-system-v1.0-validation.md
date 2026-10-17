@@ -45,3 +45,5 @@
 本轮为一台真机的自动化界面检查与截图复核；密度检查是该设备上 Android 渲染器的 1×–4× 渲染，不代表四台不同分辨率设备的人工验收。没有重复进行识别质量、真实支付或实体打印的完整验收。
 
 附加 `lintDebug` 检查首次出现 `ExperimentalDetector` 内部异常（`Unexpected owner function: null`），复跑未得到有效报告，因此不计为通过；未禁用检查规则。Debug 构建和本任务端到端验收均通过。
+
+后续工具返回来源、图片工具相册直达和拍摄补光修复，另见 [工具入口与闪光灯 v1.0 验证](tool-navigation-v1.0-validation.md)。

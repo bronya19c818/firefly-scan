@@ -124,6 +124,7 @@ fun bindCameraUseCases(
     analysisExecutor: ExecutorService,
     onAutoCaptureState: (AutoCaptureUiState) -> Unit,
     shouldAnalyze: () -> Boolean,
+    onCameraBound: (androidx.camera.core.Camera) -> Unit,
     onAutoCaptureRequest: () -> Unit
 ): ImageCapture {
     val cameraProvider = ProcessCameraProvider.getInstance(context).get()
@@ -263,7 +264,7 @@ fun bindCameraUseCases(
     }
 
     cameraProvider.unbindAll()
-    if (analysis != null) {
+    val camera = if (analysis != null) {
         val group = UseCaseGroup.Builder()
             .addUseCase(preview)
             .addUseCase(imageCapture)
@@ -283,6 +284,7 @@ fun bindCameraUseCases(
             imageCapture
         )
     }
+    onCameraBound(camera)
     return imageCapture
 }
 

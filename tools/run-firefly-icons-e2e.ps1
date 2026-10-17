@@ -24,7 +24,7 @@ try {
     $result | Set-Content -LiteralPath (Join-Path $ArtifactDirectory 'instrumentation.txt') -Encoding utf8
     $result | Write-Output
     $joined = $result -join [Environment]::NewLine
-    if ($code -ne 0 -or $joined -match 'FAILURES|Process crashed' -or $joined -notmatch 'OK \(5 tests\)') { throw '图标端到端验证失败，请检查 instrumentation.txt。' }
+    if ($code -ne 0 -or $joined -match 'FAILURES|Process crashed' -or $joined -notmatch 'OK \(7 tests\)') { throw '图标端到端验证失败，请检查 instrumentation.txt。' }
 } finally {
     & $Adb -s $Serial pull '/sdcard/Android/data/cn.yuandianai.juziscan/files/firefly-icons-e2e/.' $ArtifactDirectory
     & $Adb -s $Serial logcat -d -t 3000 -s AndroidRuntime | Set-Content -LiteralPath (Join-Path $ArtifactDirectory 'crashes.txt') -Encoding utf8
