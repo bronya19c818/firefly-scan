@@ -292,7 +292,7 @@ fun WatermarkToolScreen(onBack: () -> Unit) {
                                 executeShare(
                                     context = context,
                                     pages = listOf(dummyPage),
-                                    fileName = "桔子扫描_水印_${System.currentTimeMillis()}",
+                                    fileName = "萤火Scan_水印_${System.currentTimeMillis()}",
                                     fileType = ExportFileType.JPG,
                                     fileSize = ExportFileSize.Actual,
                                     watermarkSettings = settings

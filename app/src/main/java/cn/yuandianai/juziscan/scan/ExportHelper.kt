@@ -510,7 +510,7 @@ private fun drawBrandMark(
     width: Float,
     height: Float
 ) {
-    val text = "🍊 桔子扫描"
+    val text = "萤火Scan"
     val shortEdge = min(width, height)
     val textSize = shortEdge * 0.044f
     val horizontalPadding = textSize * 0.55f

@@ -173,7 +173,7 @@ fun ImageToPdfToolScreen(onBack: () -> Unit) {
                             executeShare(
                                 context = context,
                                 pages = pages,
-                                fileName = "桔子扫描_图片转PDF_${System.currentTimeMillis()}",
+                                fileName = "萤火Scan_图片转PDF_${System.currentTimeMillis()}",
                                 fileType = ExportFileType.PDF,
                                 fileSize = ExportFileSize.Actual
                             )

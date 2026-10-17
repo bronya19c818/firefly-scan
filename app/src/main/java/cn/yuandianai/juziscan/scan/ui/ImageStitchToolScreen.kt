@@ -171,7 +171,7 @@ fun ImageStitchToolScreen(onBack: () -> Unit) {
                                 executeShare(
                                     context = context,
                                     pages = listOf(dummyPage),
-                                    fileName = "桔子扫描_长图拼接_${System.currentTimeMillis()}",
+                                    fileName = "萤火Scan_长图拼接_${System.currentTimeMillis()}",
                                     fileType = ExportFileType.JPG,
                                     fileSize = ExportFileSize.Actual
                                 )

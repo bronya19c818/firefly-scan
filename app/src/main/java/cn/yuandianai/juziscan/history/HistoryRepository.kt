@@ -91,7 +91,7 @@ class HistoryRepository(private val context: Context) {
             val metadata = DocumentManifest(pages = emptyList(), coverSignature = "", recordId = id,
                 createdAtMillis = previous?.createdAtMillis ?: now, updatedAtMillis = now,
                 title = previous?.title ?: "文件扫描 ${timeFormat.format(Date(now))}",
-                fileName = previous?.fileName ?: "桔子扫描_文件扫描_${timestampToken(now)}.pdf",
+                fileName = previous?.fileName ?: "萤火Scan_文件扫描_${timestampToken(now)}.pdf",
                 fingerprint = fingerprint, version = (old?.version ?: 0L) + 1)
             val manifest = documentStore.save(dir, pages.toList(), metadata, reliableOnly)
             recordFromManifest(id, manifest)
@@ -266,7 +266,7 @@ class HistoryRepository(private val context: Context) {
             subtitle = "$sourcePageCount 张证件图 · PNG 图片",
             createdAtMillis = now,
             pageCount = sourcePageCount,
-            fileName = "桔子扫描_${documentType.label}_${timestampToken(now)}.png",
+            fileName = "萤火Scan_${documentType.label}_${timestampToken(now)}.png",
             filePath = file.absolutePath,
             mimeType = "image/png",
             thumbnailPath = thumb.absolutePath
@@ -297,7 +297,7 @@ class HistoryRepository(private val context: Context) {
             subtitle = buildOcrSubtitle(normalizedText),
             createdAtMillis = now,
             pageCount = 1,
-            fileName = "桔子扫描_文字识别_${timestampToken(now)}.txt",
+            fileName = "萤火Scan_文字识别_${timestampToken(now)}.txt",
             filePath = file.absolutePath,
             mimeType = "text/plain",
             thumbnailPath = thumb.absolutePath,
@@ -374,7 +374,7 @@ class HistoryRepository(private val context: Context) {
             File(record.filePath).also { require(it.isFile) { "文档文件不存在，可能已被清理" } }
         }
         val displayName = record.fileName
-            .let { if (it.startsWith("桔子扫描_")) it else "桔子扫描_$it" }
+            .let { if (it.startsWith("萤火Scan_")) it else "萤火Scan_$it" }
         val externalFile = File(context.cacheDir, displayName)
         sourceFile.copyTo(externalFile, overwrite = true)
         val uri = FileProvider.getUriForFile(

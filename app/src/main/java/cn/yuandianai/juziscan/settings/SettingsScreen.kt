@@ -106,7 +106,7 @@ fun SettingsScreen(
             Divider()
             SettingRow("会员服务协议", "", { onLegalDocClick(LegalDocType.MemberServiceAgreement) })
             Divider()
-            SettingRow("关于桔子扫描", "v$appVersion", { onLegalDocClick(LegalDocType.AboutUs) })
+            SettingRow("关于萤火Scan", "v$appVersion", { onLegalDocClick(LegalDocType.AboutUs) })
         }
         Spacer(Modifier.height(28.dp))
     }

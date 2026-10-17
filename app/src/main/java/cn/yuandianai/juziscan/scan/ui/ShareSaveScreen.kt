@@ -51,7 +51,7 @@ fun ShareSaveScreen(
     var subStage by remember { mutableStateOf(0) } // 0: Main, 1: File Type, 2: File Size
     var fileName by remember {
         val format = java.text.SimpleDateFormat("yyyy-MM-dd_HHmmss", java.util.Locale.getDefault())
-        mutableStateOf("桔子扫描_${format.format(java.util.Date())}")
+        mutableStateOf("萤火Scan_${format.format(java.util.Date())}")
     }
     var selectedType by remember { mutableStateOf(ExportFileType.PDF) }
     var selectedSize by remember { mutableStateOf(ExportFileSize.Actual) }
@@ -81,7 +81,7 @@ fun ShareSaveScreen(
                 onBack = onBack,
                 onRemoveBrandMarkClick = onRemoveBrandMarkClick,
                 onContinue = {
-                    val resolvedName = fileName.trim().ifBlank { "桔子扫描_扫描文档" }
+                    val resolvedName = fileName.trim().ifBlank { "萤火Scan_扫描文档" }
                     onShare(
                         resolvedName,
                         selectedType,
@@ -308,7 +308,7 @@ private fun ShareSaveMain(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = "免费版固定水印 🍊桔子扫描",
+                            text = "免费版固定水印 萤火Scan",
                             color = HpSmartColors.Accent,
                             fontSize = 13.sp,
                             fontWeight = FontWeight.SemiBold,

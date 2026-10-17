@@ -915,7 +915,7 @@ private fun ScannerFlowScreen(
                 executeShare(
                     context = context,
                     pages = listOf(page),
-                    fileName = "桔子扫描_${System.currentTimeMillis()}",
+                    fileName = "萤火Scan_${System.currentTimeMillis()}",
                     fileType = fileType,
                     fileSize = ExportFileSize.Actual,
                     watermarkSettings = ExportWatermarkSettings()
@@ -1001,7 +1001,7 @@ private fun ScannerFlowScreen(
             runCatching {
                 executeShareWordDocument(
                     context = context,
-                    fileName = "桔子扫描_文字识别_${System.currentTimeMillis()}",
+                    fileName = "萤火Scan_文字识别_${System.currentTimeMillis()}",
                     text = text
                 )
             }.onFailure { error ->
@@ -1023,7 +1023,7 @@ private fun ScannerFlowScreen(
             runCatching {
                 executeSharePlainText(
                     context = context,
-                    fileName = "桔子扫描_文字识别_${System.currentTimeMillis()}",
+                    fileName = "萤火Scan_文字识别_${System.currentTimeMillis()}",
                     text = text
                 )
             }.onFailure { error ->
