@@ -263,3 +263,30 @@
 - **不得只报告设计遗漏并等待用户额外发起需求**。
 
 **最终目标：萤火Scan所有实际可到达的页面属于同一产品，而不是只有首页和四张效果图改了皮肤。**
+
+## 10. 统一矢量图标规范
+
+### 10.1 来源与维护
+
+- 应用通用功能图标统一使用 [Tabler Icons](https://github.com/tabler/tabler-icons)，固定 **v3.49.0**，提交 `bbed884d15354b5cebf2493371f20dc2d5e83eaf`，采用 outline 系列。
+- 原始 SVG、SHA-256 清单及 MIT 许可保存在 `third_party/tabler-icons/`；许可同时打包到 `app/src/main/assets/licenses/tabler-icons.txt`。按需导入，不接入整套图标库运行时依赖。
+- Android 资源为 `app/src/main/res/drawable/ic_tabler_*.xml`。离线执行 `python tools/import_tabler_icons.py` 可校验固定源并重新转换；新增图标时先更新 `manifest.json`，再用 `--download` 取得该固定提交的官方源文件，最后注册 `FireflyIconName` 并更新[映射表](docs/icon-system.md)。不得直接手改生成的路径。
+- 转换保留官方路径、24×24 viewport、2 单位笔画、圆端点与圆连接；明确排除 SVG 的透明画布边界路径。遇到变换、蒙版、渐变或其他未支持元素时应停止转换并处理，不静默丢弃。
+
+### 10.2 组件、尺寸与状态
+
+- 通用功能图标通过 `common/FireflyIcon.kt` 的 `FireflyIcon` 与 `FireflyIconName` 引用。`common/Icons.kt` 仅保留旧调用签名，绘制统一委托给该组件。
+- 普通工具栏 20–24dp，快捷入口 24–32dp（首页 26dp、工具箱 24dp、底部导航 24/28dp）；文字旁辅助符号 12–16dp。主卡片 40dp、空状态 48dp、会员功能示意 64dp 为展示用途，不能直接当作工具栏尺寸。
+- 随容器调整外观大小，保持 viewport 和笔画比例；不拉伸为宽扁图形。小图标的点击区域由外层按钮负责，不能随图形一起缩小。
+- 默认继承 `LocalContentColor`；选中态使用 `MaterialTheme.colorScheme.primary`；禁用态统一乘以 `FireflyIconDefaults.DisabledAlpha`。相机页、品牌底座及错误/会员强调色由调用处从主题或 `FireflyColors` 传入，组件内部不得硬编码业务颜色。
+- 全部工具每行四个等宽入口，底座 52dp、图标 24dp、标签 12sp，按可用宽度分配列宽，分区使用紧凑间距；文字允许两行。
+- 首页保留 A1 彩色圆角底座，相册入口采用薄荷青底与深湖青线条；首页、扫描、我的统一使用同一 outline 系列，活跃导航以深湖青强调。
+- 仅图形的操作需要清晰的 `contentDescription`，例如返回、相册导入、更多操作。已有等价文字或纯装饰图形传 `null`，避免读屏重复。点击、权限、导入和业务回调保留在调用方。
+
+### 10.3 新增图标约束与检查
+
+新增图标必须先检索 Tabler 的标准图标及合理替代项；只有无法表达业务含义时才建立自定义矢量。自定义资源同样采用 24×24 网格、2 单位笔画、圆端点及圆连接，检查轮廓连接、重叠和缝隙，并在映射表记录原因。不使用临时 Canvas 拼画、Emoji 或生成 PNG 替代已有标准功能图标。
+
+Logo、萤火、光环与背景继续采用 `design_image/` 对应的定稿品牌资源；相机识别框、裁剪控制点、证件版式缩略图、真实二维码与图片处理属于业务内容，按原有绘制流程呈现。
+
+图标更新后需通过 Debug 构建，在真实 Android 界面检查首页、相册导入、工具箱、导航及受影响工具页；同时检查 20/24/32dp、浅深主题、选中/禁用状态和 1×–4× 光栅化的透明区域与笔画比例。执行方式与可重复截图工件见 [docs/icon-system.md](docs/icon-system.md)。

@@ -40,6 +40,7 @@ import java.io.File
 import java.io.FileOutputStream
 import java.net.Inet4Address
 import java.net.NetworkInterface
+import cn.yuandianai.juziscan.common.FireflyIconName
 
 @Composable
 fun WiFiTransferToolScreen(onBack: () -> Unit) {
@@ -129,7 +130,7 @@ fun WiFiTransferToolScreen(onBack: () -> Unit) {
             verticalArrangement = Arrangement.spacedBy(24.dp)
         ) {
             ToolIntroCard(
-                imageRes = R.drawable.tool_wifi_transfer,
+                icon = FireflyIconName.Wifi,
                 title = "WiFi 传图",
                 message = "让手机和电脑处于同一 WiFi 下，扫码或访问地址，就能无线传图。"
             )

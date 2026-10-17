@@ -33,9 +33,10 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.ByteArrayOutputStream
+import cn.yuandianai.juziscan.common.FireflyIconName
 
 @Composable
-fun ImageCompressToolScreen(onBack: () -> Unit) {
+fun ImageCompressToolScreen(onBack: () -> Unit, openPickerOnEntry: Boolean = false) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
@@ -55,7 +56,7 @@ fun ImageCompressToolScreen(onBack: () -> Unit) {
             isProcessing = true
             scope.launch {
                 val bitmap = withContext(Dispatchers.IO) {
-                    loadBitmapFromUri(context, uri)
+                    runCatching { loadBitmapFromUri(context, uri) }.getOrNull()
                 }
                 if (bitmap != null) {
                     sourceBitmap = bitmap
@@ -64,10 +65,15 @@ fun ImageCompressToolScreen(onBack: () -> Unit) {
                     }
                 } else {
                     Toast.makeText(context, "图片加载失败", Toast.LENGTH_SHORT).show()
+                    if (openPickerOnEntry && sourceBitmap == null) onBack()
                 }
                 isProcessing = false
             }
-        }
+        } else if (openPickerOnEntry && sourceBitmap == null) onBack()
+    }
+
+    LaunchedEffect(Unit) {
+        if (openPickerOnEntry) photoPickerLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
     }
 
     // Refresh compression preview when settings change
@@ -100,8 +106,8 @@ fun ImageCompressToolScreen(onBack: () -> Unit) {
         ToolHeader(title = "图片压缩", onBack = onBack)
 
         if (sourceBitmap == null && !isProcessing) {
-            ToolEmptyState(
-                imageRes = R.drawable.tool_compress,
+            if (!openPickerOnEntry) ToolEmptyState(
+                icon = FireflyIconName.Compress,
                 title = "图片压缩",
                 message = "选择图片后可调整压缩等级，平衡清晰度和文件体积，发图更轻松。",
                 actionText = "从相册选择",

@@ -1,0 +1,3 @@
+# Keep pinned upstream SVG and license bytes stable on Windows checkouts.
+third_party/tabler-icons/** text eol=lf
+app/src/main/assets/licenses/tabler-icons.txt text eol=lf

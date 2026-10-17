@@ -32,9 +32,10 @@ import cn.yuandianai.juziscan.ui.theme.HpSmartColors
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import cn.yuandianai.juziscan.common.FireflyIconName
 
 @Composable
-fun WatermarkToolScreen(onBack: () -> Unit) {
+fun WatermarkToolScreen(onBack: () -> Unit, openPickerOnEntry: Boolean = false) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
@@ -51,15 +52,20 @@ fun WatermarkToolScreen(onBack: () -> Unit) {
         if (uri != null) {
             scope.launch {
                 val bitmap = withContext(Dispatchers.IO) {
-                    loadBitmapFromUri(context, uri)
+                    runCatching { loadBitmapFromUri(context, uri) }.getOrNull()
                 }
                 if (bitmap != null) {
                     sourceBitmap = bitmap
                 } else {
                     Toast.makeText(context, "图片加载失败", Toast.LENGTH_SHORT).show()
+                    if (openPickerOnEntry && sourceBitmap == null) onBack()
                 }
             }
-        }
+        } else if (openPickerOnEntry && sourceBitmap == null) onBack()
+    }
+
+    LaunchedEffect(Unit) {
+        if (openPickerOnEntry) photoPickerLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
     }
 
     // Refresh preview when settings change
@@ -86,8 +92,8 @@ fun WatermarkToolScreen(onBack: () -> Unit) {
         ToolHeader(title = "添加水印", onBack = onBack)
 
         if (sourceBitmap == null) {
-            ToolEmptyState(
-                imageRes = R.drawable.tool_watermark,
+            if (!openPickerOnEntry) ToolEmptyState(
+                icon = FireflyIconName.Watermark,
                 title = "添加水印",
                 message = "选择一张图片后，可以快速加上业务办理、仅供使用等水印内容。",
                 actionText = "从相册选择",

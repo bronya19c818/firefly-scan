@@ -286,7 +286,7 @@ fun CameraCaptureScreen(
                             labelTopPadding = 0.dp,
                             onClick = onSourceClick
                         ) {
-                            GalleryPhotoIcon(color = Color.White, modifier = Modifier.size(42.dp))
+                            GalleryPhotoIcon(color = HpSmartColors.CameraText, modifier = Modifier.size(28.dp))
                         }
                     }
 
@@ -987,7 +987,7 @@ private fun MoreIdCardDocumentDialog(
                         )
                     }
                     TopIconButton(onClick = onDismiss) {
-                        CloseCrossIcon(color = Color.White, modifier = Modifier.size(18.dp))
+                        CloseCrossIcon(color = HpSmartColors.CameraText, modifier = Modifier.size(20.dp))
                     }
                 }
 

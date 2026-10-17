@@ -31,6 +31,8 @@ import androidx.compose.ui.unit.sp
 import cn.yuandianai.juziscan.common.BackArrowIcon
 import cn.yuandianai.juziscan.ui.theme.FireflyColors
 import cn.yuandianai.juziscan.ui.theme.FireflyTypography
+import cn.yuandianai.juziscan.common.FireflyIcon
+import cn.yuandianai.juziscan.common.FireflyIconName
 
 /**
  * 萤火Scan 通用组件（design.md 第 6 节）。
@@ -172,12 +174,7 @@ fun FireflySectionHeader(
                     style = FireflyTypography.labelMedium
                 )
                 Spacer(modifier = Modifier.width(2.dp))
-                Text(
-                    text = "›",
-                    color = FireflyColors.SecondaryText,
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.Medium
-                )
+                FireflyIcon(FireflyIconName.ChevronRight, size = 16.dp, tint = FireflyColors.SecondaryText, contentDescription = null)
             }
         }
     }
@@ -221,7 +218,11 @@ fun FireflyEmptyState(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        FireflySparkGlyph(color = FireflyColors.Mint, modifier = Modifier.size(30.dp))
+        androidx.compose.foundation.Image(
+            painter = androidx.compose.ui.res.painterResource(cn.yuandianai.juziscan.R.drawable.firefly_logo_badge),
+            contentDescription = null,
+            modifier = Modifier.size(40.dp)
+        )
         Spacer(modifier = Modifier.height(12.dp))
         Text(
             text = text,
@@ -236,58 +237,5 @@ fun FireflyEmptyState(
                 style = FireflyTypography.bodySmall
             )
         }
-    }
-}
-
-/** 萤火光点装饰：发光圆点 + 十字星芒，用于品牌区与空状态 */
-@Composable
-fun FireflySparkGlyph(color: Color, modifier: Modifier = Modifier) {
-    androidx.compose.foundation.Canvas(modifier = modifier) {
-        val w = size.width
-        val h = size.height
-        val center = androidx.compose.ui.geometry.Offset(w / 2f, h / 2f)
-        // 光晕
-        drawCircle(
-            color = color.copy(alpha = 0.30f),
-            radius = size.minDimension * 0.42f,
-            center = center
-        )
-        drawCircle(
-            color = color,
-            radius = size.minDimension * 0.18f,
-            center = center
-        )
-        // 星芒
-        val stroke = 1.6.dp.toPx()
-        val inner = size.minDimension * 0.28f
-        val outer = size.minDimension * 0.48f
-        drawLine(
-            color = color.copy(alpha = 0.85f),
-            start = androidx.compose.ui.geometry.Offset(center.x, center.y - outer),
-            end = androidx.compose.ui.geometry.Offset(center.x, center.y - inner),
-            strokeWidth = stroke,
-            cap = androidx.compose.ui.graphics.StrokeCap.Round
-        )
-        drawLine(
-            color = color.copy(alpha = 0.85f),
-            start = androidx.compose.ui.geometry.Offset(center.x, center.y + inner),
-            end = androidx.compose.ui.geometry.Offset(center.x, center.y + outer),
-            strokeWidth = stroke,
-            cap = androidx.compose.ui.graphics.StrokeCap.Round
-        )
-        drawLine(
-            color = color.copy(alpha = 0.85f),
-            start = androidx.compose.ui.geometry.Offset(center.x - outer, center.y),
-            end = androidx.compose.ui.geometry.Offset(center.x - inner, center.y),
-            strokeWidth = stroke,
-            cap = androidx.compose.ui.graphics.StrokeCap.Round
-        )
-        drawLine(
-            color = color.copy(alpha = 0.85f),
-            start = androidx.compose.ui.geometry.Offset(center.x + inner, center.y),
-            end = androidx.compose.ui.geometry.Offset(center.x + outer, center.y),
-            strokeWidth = stroke,
-            cap = androidx.compose.ui.graphics.StrokeCap.Round
-        )
     }
 }

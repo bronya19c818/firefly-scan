@@ -20,13 +20,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.SpanStyle
@@ -42,6 +38,8 @@ import cn.yuandianai.juziscan.payment.MembershipPlan
 import cn.yuandianai.juziscan.payment.MembershipStatus
 import cn.yuandianai.juziscan.scan.LegalDocType
 import cn.yuandianai.juziscan.ui.theme.HpSmartColors
+import cn.yuandianai.juziscan.common.FireflyIcon
+import cn.yuandianai.juziscan.common.FireflyIconName
 
 private val VipBackgroundBlue = Color(0xFFE8F2FF)
 private val VipBackgroundLight = Color(0xFFF7FAFF)
@@ -325,12 +323,7 @@ fun VipScreen(
                         contentAlignment = Alignment.Center
                     ) {
                         if (isAgreed) {
-                            Text(
-                                text = "✓",
-                                color = Color.White,
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.Bold
-                            )
+                            FireflyIcon(FireflyIconName.Check, size = 12.dp, tint = androidx.compose.material3.MaterialTheme.colorScheme.onPrimary, contentDescription = null)
                         }
                     }
 
@@ -388,7 +381,7 @@ private fun MemberCenterHeader(expireAt: String?, onBack: () -> Unit) {
                 .clickable(onClick = onBack),
             contentAlignment = Alignment.Center
         ) {
-            CloseCrossIcon(color = Color.White, modifier = Modifier.size(16.dp))
+            CloseCrossIcon(color = Color.White, modifier = Modifier.size(20.dp))
         }
 
         Column(
@@ -406,7 +399,7 @@ private fun MemberCenterHeader(expireAt: String?, onBack: () -> Unit) {
                     ),
                 contentAlignment = Alignment.Center
             ) {
-                Text(text = "♛", color = Color(0xFF5B3B00), fontSize = 34.sp, fontWeight = FontWeight.Bold)
+                FireflyIcon(FireflyIconName.Crown, size = 32.dp, tint = androidx.compose.material3.MaterialTheme.colorScheme.primary)
             }
             Spacer(modifier = Modifier.height(14.dp))
             Text(text = "高级会员", color = Color(0xFFFFDF83), fontSize = 24.sp, fontWeight = FontWeight.Bold)
@@ -558,198 +551,22 @@ private fun TopPagerSection(onBack: () -> Unit) {
 
 @Composable
 private fun IdCardIllustration(modifier: Modifier = Modifier) {
-    Canvas(modifier = modifier) {
-        val clipWidth = size.width * 0.75f
-        val clipHeight = size.height * 0.90f
-        val centerOffset = Offset(size.width * 0.5f, size.height * 0.5f)
-
-        // Draw Lanyard Strap
-        val lanyardPath = Path().apply {
-            moveTo(size.width * 0.5f, 0f)
-            quadraticTo(
-                size.width * 0.5f,
-                size.height * 0.25f,
-                size.width * 0.5f,
-                size.height * 0.25f
-            )
-        }
-        drawPath(
-            path = lanyardPath,
-            color = Color(0xFFEAB308), // Yellow lanyard strap
-            style = Stroke(width = 4.dp.toPx(), cap = StrokeCap.Round)
-        )
-
-        // Lanyard Metal Clip
-        drawCircle(
-            color = Color(0xFF94A3B8),
-            radius = 6.dp.toPx(),
-            center = Offset(size.width * 0.5f, size.height * 0.23f)
-        )
-
-        // The ID Card badge itself
-        drawRoundRect(
-            color = Color(0xFFFFD700), // Card yellow
-            topLeft = Offset(size.width * 0.25f, size.height * 0.27f),
-            size = Size(size.width * 0.58f, size.height * 0.65f),
-            cornerRadius = androidx.compose.ui.geometry.CornerRadius(8.dp.toPx())
-        )
-
-        // Card header text representation
-        drawRoundRect(
-            color = Color(0xFFEAB308),
-            topLeft = Offset(size.width * 0.32f, size.height * 0.33f),
-            size = Size(size.width * 0.44f, size.height * 0.08f),
-            cornerRadius = androidx.compose.ui.geometry.CornerRadius(2.dp.toPx())
-        )
-
-        // Avatar Profile placeholder inside ID Card
-        drawRoundRect(
-            color = Color.White,
-            topLeft = Offset(size.width * 0.38f, size.height * 0.45f),
-            size = Size(size.width * 0.32f, size.height * 0.32f),
-            cornerRadius = androidx.compose.ui.geometry.CornerRadius(4.dp.toPx())
-        )
-
-        // Stylized user avatar figure
-        drawCircle(
-            color = Color(0xFF3B82F6), // Blue head
-            radius = 7.dp.toPx(),
-            center = Offset(size.width * 0.54f, size.height * 0.52f)
-        )
-        val bodyPath = Path().apply {
-            moveTo(size.width * 0.45f, size.height * 0.72f)
-            lineTo(size.width * 0.63f, size.height * 0.72f)
-            lineTo(size.width * 0.59f, size.height * 0.60f)
-            lineTo(size.width * 0.49f, size.height * 0.60f)
-            close()
-        }
-        drawPath(bodyPath, Color(0xFF1E293B))
-
-        // Barcode / detail placeholder
-        drawLine(
-            color = Color(0xFF1E293B),
-            start = Offset(size.width * 0.35f, size.height * 0.82f),
-            end = Offset(size.width * 0.73f, size.height * 0.82f),
-            strokeWidth = 2.dp.toPx()
-        )
+    Box(modifier = modifier, contentAlignment = Alignment.Center) {
+        FireflyIcon(FireflyIconName.IdCard, size = 64.dp, tint = androidx.compose.material3.MaterialTheme.colorScheme.primary, contentDescription = null)
     }
 }
 
 @Composable
 private fun OcrIllustration(modifier: Modifier = Modifier) {
-    val infiniteTransition = rememberInfiniteTransition(label = "ocr_scan")
-    val scanY by infiniteTransition.animateFloat(
-        initialValue = 0.25f,
-        targetValue = 0.75f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 1500, easing = LinearEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "scan_y"
-    )
-
-    Canvas(modifier = modifier) {
-        // Background paper sheet
-        drawRoundRect(
-            color = Color.White,
-            topLeft = Offset(size.width * 0.22f, size.height * 0.15f),
-            size = Size(size.width * 0.56f, size.height * 0.70f),
-            cornerRadius = androidx.compose.ui.geometry.CornerRadius(6.dp.toPx())
-        )
-
-        // Lines of text placeholders
-        val lines = listOf(
-            Offset(0.3f, 0.25f) to 0.4f,
-            Offset(0.3f, 0.35f) to 0.3f,
-            Offset(0.3f, 0.45f) to 0.45f,
-            Offset(0.3f, 0.55f) to 0.35f,
-            Offset(0.3f, 0.65f) to 0.4f,
-            Offset(0.3f, 0.75f) to 0.25f
-        )
-
-        lines.forEach { (startRatio, lengthRatio) ->
-            val startX = size.width * startRatio.x
-            val startY = size.height * startRatio.y
-            val width = size.width * lengthRatio
-            
-            // Check if scanning line covers this line to highlight it
-            val isHighlighted = kotlin.math.abs((startY / size.height) - scanY) < 0.08f
-            
-            drawRoundRect(
-                color = if (isHighlighted) Color(0xFF60A5FA) else Color(0xFFE2E8F0),
-                topLeft = Offset(startX, startY),
-                size = Size(width, 6.dp.toPx()),
-                cornerRadius = androidx.compose.ui.geometry.CornerRadius(2.dp.toPx())
-            )
-        }
-
-        // Scanning beam laser line
-        val scanLineY = size.height * scanY
-        drawLine(
-            color = Color(0xFF3B82F6),
-            start = Offset(size.width * 0.18f, scanLineY),
-            end = Offset(size.width * 0.82f, scanLineY),
-            strokeWidth = 3.dp.toPx(),
-            cap = StrokeCap.Round
-        )
-
-        // Glowing gradient under laser
-        drawRect(
-            brush = Brush.verticalGradient(
-                colors = listOf(Color(0xFF3B82F6).copy(alpha = 0.22f), Color.Transparent),
-                startY = scanLineY,
-                endY = scanLineY + 24.dp.toPx()
-            ),
-            topLeft = Offset(size.width * 0.22f, scanLineY),
-            size = Size(size.width * 0.56f, 24.dp.toPx())
-        )
+    Box(modifier = modifier, contentAlignment = Alignment.Center) {
+        FireflyIcon(FireflyIconName.TextScan, size = 64.dp, tint = androidx.compose.material3.MaterialTheme.colorScheme.primary, contentDescription = null)
     }
 }
 
 @Composable
 private fun TableIllustration(modifier: Modifier = Modifier) {
-    Canvas(modifier = modifier) {
-        // Draw a spreadsheet background
-        drawRoundRect(
-            color = Color(0xFFF1F5F9),
-            topLeft = Offset(size.width * 0.15f, size.height * 0.12f),
-            size = Size(size.width * 0.7f, size.height * 0.76f),
-            cornerRadius = androidx.compose.ui.geometry.CornerRadius(10.dp.toPx())
-        )
-        
-        // Draw grid headers
-        drawRoundRect(
-            color = Color(0xFF3B82F6).copy(alpha = 0.2f),
-            topLeft = Offset(size.width * 0.15f, size.height * 0.12f),
-            size = Size(size.width * 0.7f, size.height * 0.15f),
-            cornerRadius = androidx.compose.ui.geometry.CornerRadius(10.dp.toPx())
-        )
-
-        // Draw vertical grid lines
-        val cols = 4
-        val colWidth = (size.width * 0.7f) / cols
-        for (i in 1 until cols) {
-            val x = size.width * 0.15f + i * colWidth
-            drawLine(
-                color = Color(0xFFCBD5E1),
-                start = Offset(x, size.height * 0.12f),
-                end = Offset(x, size.height * 0.88f),
-                strokeWidth = 1.5.dp.toPx()
-            )
-        }
-
-        // Draw horizontal grid lines
-        val rows = 5
-        val rowHeight = (size.height * 0.76f) / rows
-        for (i in 1 until rows) {
-            val y = size.height * 0.12f + i * rowHeight
-            drawLine(
-                color = Color(0xFFCBD5E1),
-                start = Offset(size.width * 0.15f, y),
-                end = Offset(size.width * 0.85f, y),
-                strokeWidth = 1.5.dp.toPx()
-            )
-        }
+    Box(modifier = modifier, contentAlignment = Alignment.Center) {
+        FireflyIcon(FireflyIconName.Table, size = 64.dp, tint = androidx.compose.material3.MaterialTheme.colorScheme.primary, contentDescription = null)
     }
 }
 
@@ -802,7 +619,7 @@ private fun CompactPaymentSelectionSection(
                     .background(Color(0xFF09BB07), CircleShape),
                 contentAlignment = Alignment.Center
             ) {
-                Text(text = "✔", color = Color.White, fontSize = 8.sp, fontWeight = FontWeight.Bold)
+                FireflyIcon(FireflyIconName.Wallet, size = 16.dp, tint = androidx.compose.material3.MaterialTheme.colorScheme.onPrimary, contentDescription = null)
             }
             
             Spacer(modifier = Modifier.width(6.dp))
@@ -851,7 +668,7 @@ private fun CompactPaymentSelectionSection(
                     .background(Color(0xFF108EE9), CircleShape),
                 contentAlignment = Alignment.Center
             ) {
-                Text(text = "支", color = Color.White, fontSize = 8.sp, fontWeight = FontWeight.Bold)
+                FireflyIcon(FireflyIconName.Wallet, size = 16.dp, tint = androidx.compose.material3.MaterialTheme.colorScheme.onPrimary, contentDescription = null)
             }
             
             Spacer(modifier = Modifier.width(6.dp))
@@ -1036,7 +853,7 @@ private fun RefundGuaranteeSection() {
         Row(
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(text = "🛡️", fontSize = 14.sp)
+            FireflyIcon(FireflyIconName.Shield, size = 16.dp, tint = androidx.compose.material3.MaterialTheme.colorScheme.primary, contentDescription = null)
             Spacer(modifier = Modifier.width(6.dp))
             Text(
                 text = "会员权益开通后生效，可在有效期内持续使用",
@@ -1045,12 +862,7 @@ private fun RefundGuaranteeSection() {
                 fontWeight = FontWeight.Medium
             )
         }
-        Text(
-            text = ">",
-            color = Color(0xFF94A3B8),
-            fontSize = 12.sp,
-            fontWeight = FontWeight.Bold
-        )
+        FireflyIcon(FireflyIconName.ChevronRight, size = 16.dp, tint = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant, contentDescription = null)
     }
 }
 
@@ -1229,25 +1041,10 @@ private fun BenefitsTableSection() {
                 )
 
                 // Free user column
-                val freeColor = if (free == "✖") Color(0xFFEF4444) else TextGray
-                Text(
-                    text = free,
-                    color = freeColor,
-                    fontSize = 12.sp,
-                    modifier = Modifier.weight(0.3f),
-                    textAlign = TextAlign.Center
-                )
+                BenefitValue(value = free, modifier = Modifier.weight(0.3f))
 
                 // VIP column
-                val vipColor = if (vip == "✓") Color(0xFF10B981) else Color(0xFFD4AF37)
-                Text(
-                    text = vip,
-                    color = vipColor,
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.weight(0.3f),
-                    textAlign = TextAlign.Center
-                )
+                BenefitValue(value = vip, modifier = Modifier.weight(0.3f))
             }
         }
     }
@@ -1282,4 +1079,15 @@ private fun ClickableTextCompat(
 // Simulated delay helper
 private suspend fun delay(timeMillis: Long) {
     kotlinx.coroutines.delay(timeMillis)
+}
+
+@Composable
+private fun BenefitValue(value: String, modifier: Modifier = Modifier) {
+    Box(modifier = modifier, contentAlignment = Alignment.Center) {
+        when (value) {
+            "✓" -> FireflyIcon(FireflyIconName.Check, size = 16.dp, tint = androidx.compose.material3.MaterialTheme.colorScheme.primary, contentDescription = "支持")
+            "✖" -> FireflyIcon(FireflyIconName.Close, size = 16.dp, tint = androidx.compose.material3.MaterialTheme.colorScheme.error, contentDescription = "不支持")
+            else -> Text(text = value, color = TextGray, fontSize = 12.sp, textAlign = TextAlign.Center)
+        }
+    }
 }

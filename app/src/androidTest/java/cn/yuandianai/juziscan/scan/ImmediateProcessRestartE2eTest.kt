@@ -90,7 +90,7 @@ class ImmediateProcessRestartE2eTest {
         ui.onRoot().performTouchInput { swipe(first, third, 900) }
         ui.onNodeWithText("完成").performTouchInput { click() }
         ui.onNodeWithText("旋转").performTouchInput { click() }
-        ui.onNodeWithText("···").performTouchInput { click() }
+        ui.onNodeWithContentDescription("更多操作").performTouchInput { click() }
         ui.onNodeWithText("编辑").performTouchInput { click() }
         ui.waitUntil(20_000) { ui.onAllNodesWithText("铺满").fetchSemanticsNodes().isNotEmpty() }
         ui.onNodeWithText("铺满").performTouchInput { click() }
@@ -98,7 +98,7 @@ class ImmediateProcessRestartE2eTest {
         ui.onNodeWithText("图片处理").assertExists()
         ui.onNodeWithText("完成").performTouchInput { click() }
         ui.onNodeWithContentDescription("扫描预览 1").performTouchInput { swipeLeft() }
-        ui.onNodeWithText("···").performTouchInput { click() }
+        ui.onNodeWithContentDescription("更多操作").performTouchInput { click() }
         ui.onNodeWithText("删除").performTouchInput { click() }
         instrumentation.runOnMainSync { ui.activity.onBackPressedDispatcher.onBackPressed() }
         ui.onNodeWithText("最近文档").assertExists()

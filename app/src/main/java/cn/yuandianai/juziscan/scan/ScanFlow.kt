@@ -117,6 +117,8 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import cn.yuandianai.juziscan.common.FireflyIcon
+import cn.yuandianai.juziscan.common.FireflyIconName
 
 @Composable
 fun ScanFlow() {
@@ -293,23 +295,10 @@ private fun PermissionBenefit(text: String) {
         Box(
             modifier = Modifier
                 .size(22.dp)
-                .background(Color(0xFFE7EFFF), CircleShape),
+                .background(androidx.compose.material3.MaterialTheme.colorScheme.primaryContainer, CircleShape),
             contentAlignment = Alignment.Center
         ) {
-            Canvas(modifier = Modifier.size(12.dp)) {
-                drawLine(
-                    color = Color(0xFF0B63FF),
-                    start = Offset(size.width * 0.18f, size.height * 0.55f),
-                    end = Offset(size.width * 0.42f, size.height * 0.78f),
-                    strokeWidth = 2.2.dp.toPx()
-                )
-                drawLine(
-                    color = Color(0xFF0B63FF),
-                    start = Offset(size.width * 0.42f, size.height * 0.78f),
-                    end = Offset(size.width * 0.86f, size.height * 0.22f),
-                    strokeWidth = 2.2.dp.toPx()
-                )
-            }
+            FireflyIcon(FireflyIconName.Check, size = 16.dp, tint = androidx.compose.material3.MaterialTheme.colorScheme.primary, contentDescription = null)
         }
         Text(
             text = text,
@@ -321,33 +310,8 @@ private fun PermissionBenefit(text: String) {
 }
 
 @Composable
-private fun CameraPermissionGlyph(
-    color: Color,
-    modifier: Modifier = Modifier
-) {
-    Canvas(modifier = modifier) {
-        val stroke = 4.dp.toPx()
-        drawRoundRect(
-            color = color,
-            topLeft = Offset(size.width * 0.10f, size.height * 0.28f),
-            size = Size(size.width * 0.80f, size.height * 0.58f),
-            cornerRadius = androidx.compose.ui.geometry.CornerRadius(12.dp.toPx(), 12.dp.toPx()),
-            style = Stroke(width = stroke)
-        )
-        drawRoundRect(
-            color = color,
-            topLeft = Offset(size.width * 0.31f, size.height * 0.16f),
-            size = Size(size.width * 0.30f, size.height * 0.18f),
-            cornerRadius = androidx.compose.ui.geometry.CornerRadius(6.dp.toPx(), 6.dp.toPx()),
-            style = Stroke(width = stroke)
-        )
-        drawCircle(
-            color = color,
-            radius = size.minDimension * 0.18f,
-            center = Offset(size.width * 0.50f, size.height * 0.58f),
-            style = Stroke(width = stroke)
-        )
-    }
+private fun CameraPermissionGlyph(color: Color, modifier: Modifier = Modifier) {
+    FireflyIcon(FireflyIconName.Camera, tint = color, modifier = modifier, contentDescription = null)
 }
 
 @Composable
@@ -366,6 +330,7 @@ private fun ScannerFlowScreen(
     val scope = rememberCoroutineScope()
     val screenActive = remember { AtomicBoolean(true) }
     val vm = remember { ScanViewModel() }
+    var boundCamera by remember { mutableStateOf<androidx.camera.core.Camera?>(null) }
     var cameraResumed by remember(lifecycleOwner) {
         mutableStateOf(lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED))
     }
@@ -1346,6 +1311,22 @@ private fun ScannerFlowScreen(
             if (openedFromHistory) finishDocument() else showExitDialog = true
         }
 
+        fun closeCapture() {
+            if (isCapturing || isProcessingPreview) return
+            when {
+                replacingIndex != null -> {
+                    replacingIndex = null
+                    clearEditorAfterUse()
+                    stage = ScanStage.Preview
+                }
+                currentTask.entry == ScanEntry.IdCard && !showIdCardGuideOverlay -> showIdCardGuideOverlay = true
+                currentTask.entry == ScanEntry.IdCard && idCardCapturedPages.isNotEmpty() && idCardCompositePage != null -> stage = ScanStage.IdCardResult
+                currentTask == CaptureTask.Document && pages.isNotEmpty() -> openPreviewAt(pages.lastIndex)
+                currentTask == CaptureTask.Document -> finishDocument()
+                else -> returnToEntry()
+            }
+        }
+
         fun deleteCurrentDocument() {
             val id = currentDocumentRecordId
             if (id == null) { finishDocument(); return }
@@ -1366,16 +1347,22 @@ private fun ScannerFlowScreen(
             }
         }
 
-        BackHandler(enabled = isProcessingPreview || (currentTask == CaptureTask.Document && stage in listOf(
+        BackHandler(enabled = isProcessingPreview || stage in listOf(
+            ScanStage.Capture, ScanStage.EdgeReview, ScanStage.ShareSave,
+            ScanStage.OcrResult, ScanStage.IdCardResult, ScanStage.TableResult,
+            ScanStage.WatermarkTool, ScanStage.ImageStitchTool, ScanStage.ImageToPdfTool,
+            ScanStage.ImageCompressTool, ScanStage.QrCodeTool, ScanStage.WiFiTransferTool, ScanStage.AllTools
+        ) || (currentTask == CaptureTask.Document && stage in listOf(
             ScanStage.Preview, ScanStage.Capture, ScanStage.EdgeReview, ScanStage.ImageProcessing, ScanStage.Reorder, ScanStage.ShareSave
         ))) {
             if (stage == ScanStage.Preview || !isProcessingPreview) {
                 when (stage) {
                     ScanStage.Preview -> leaveDocumentPreview()
-                    ScanStage.Capture -> if (!isCapturing) {
-                        replacingIndex = null
-                        if (pages.isNotEmpty()) openPreviewAt(activeIndex) else finishDocument()
-                    }
+                    ScanStage.Capture -> closeCapture()
+                    ScanStage.OcrResult, ScanStage.IdCardResult, ScanStage.TableResult -> showExitDialog = true
+                    ScanStage.WatermarkTool, ScanStage.ImageStitchTool, ScanStage.ImageToPdfTool,
+                    ScanStage.ImageCompressTool, ScanStage.QrCodeTool, ScanStage.WiFiTransferTool -> returnToEntry()
+                    ScanStage.AllTools -> stage = ScanStage.Home
                     ScanStage.ImageProcessing -> stage = ScanStage.EdgeReview
                     ScanStage.EdgeReview -> {
                         clearEditorAfterUse()
@@ -1390,8 +1377,28 @@ private fun ScannerFlowScreen(
         }
 
         Box(modifier = Modifier.fillMaxSize()) {
-            LaunchedEffect(imageCapture, flashMode) {
+            DisposableEffect(imageCapture, boundCamera, flashMode) {
                 imageCapture?.flashMode = flashMode.imageCaptureMode
+                val camera = boundCamera ?: return@DisposableEffect onDispose { }
+                if (!camera.cameraInfo.hasFlashUnit()) {
+                    flashMode = FlashModeOption.Off
+                    return@DisposableEffect onDispose { }
+                }
+                var requestActive = true
+                val requestedMode = flashMode
+                val request = camera.cameraControl.enableTorch(requestedMode == FlashModeOption.On)
+                request.addListener({
+                    runCatching { request.get() }.onFailure { error ->
+                        if (requestActive && boundCamera === camera && cameraResumed &&
+                            lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED) &&
+                            stage == ScanStage.Capture && flashMode == requestedMode) {
+                            Log.e("JuZiScan", "Flash control failed", error)
+                            flashMode = FlashModeOption.Off
+                            Toast.makeText(context, "闪光灯切换失败，请重试", Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                }, mainExecutor)
+                onDispose { requestActive = false }
             }
 
             when (stage) {
@@ -1492,7 +1499,7 @@ private fun ScannerFlowScreen(
                     AllToolsScreen(
                         onBack = { stage = ScanStage.Home },
                         onToolClick = { entry ->
-                            startEntry(entry)
+                            startEntry(entry, returnStage = ScanStage.AllTools)
                         }
                     )
                 }
@@ -1633,6 +1640,12 @@ private fun ScannerFlowScreen(
                                 resetAutoCaptureHint()
                             },
                             onFlashModeClick = {
+                                val camera = boundCamera ?: return@CameraCaptureScreen
+                                if (isCapturing || isProcessingPreview) return@CameraCaptureScreen
+                                if (!camera.cameraInfo.hasFlashUnit()) {
+                                    Toast.makeText(context, "当前相机不支持闪光灯", Toast.LENGTH_SHORT).show()
+                                    return@CameraCaptureScreen
+                                }
                                 val nextMode = flashMode.next()
                                 flashMode = nextMode
                                 imageCapture?.flashMode = nextMode.imageCaptureMode
@@ -1647,26 +1660,7 @@ private fun ScannerFlowScreen(
                                     singlePhotoPickerLauncher.launch(request)
                                 }
                             },
-                            onCloseClick = {
-                                if (isCapturing || isProcessingPreview) return@CameraCaptureScreen
-                                when {
-                                    replacingIndex != null -> {
-                                        replacingIndex = null
-                                        clearEditorAfterUse()
-                                        stage = ScanStage.Preview
-                                    }
-                                    currentTask.entry == ScanEntry.IdCard && !showIdCardGuideOverlay -> {
-                                        showIdCardGuideOverlay = true
-                                    }
-                                    currentTask.entry == ScanEntry.IdCard && idCardCapturedPages.isNotEmpty() && idCardCompositePage != null -> {
-                                        stage = ScanStage.IdCardResult
-                                    }
-                                    currentTask == CaptureTask.Document && pages.isNotEmpty() -> {
-                                        openPreviewAt(pages.lastIndex)
-                                    }
-                                    else -> returnToHome()
-                                }
-                            },
+                            onCloseClick = { closeCapture() },
                             onCaptureClick = {
                                 if (captureMode == CaptureModeOption.Manual || !currentTask.supportsAutoCapture) {
                                     triggerCapture()
@@ -1698,7 +1692,7 @@ private fun ScannerFlowScreen(
                                     openPreviewAt(activeIndex)
                                 } else if (currentTask == CaptureTask.Document) {
                                     finishDocument()
-                                } else returnToHome()
+                                } else returnToEntry()
                             }
                         )
                     }
@@ -1932,7 +1926,7 @@ private fun ScannerFlowScreen(
                                 newPages.removeAt(activeIndex)
                                 if (!commitPageEdits(newPages)) return@PreviewResultScreen
                                 if (pages.isEmpty()) {
-                                    returnToHome()
+                                    finishDocument()
                                 } else {
                                     activeIndex = activeIndex.coerceIn(0, pages.lastIndex)
                                 }
@@ -1947,7 +1941,7 @@ private fun ScannerFlowScreen(
                     } else if (isProcessingPreview) {
                         PreviewLoadingScreen()
                     } else {
-                        returnToHome()
+                        finishDocument()
                     }
                 }
 
@@ -1972,7 +1966,7 @@ private fun ScannerFlowScreen(
                 ScanStage.ShareSave -> {
                     val exportPages = shareSavePages
                     if (exportPages.isEmpty()) {
-                        returnToHome()
+                        if (currentTask == CaptureTask.Document) finishDocument() else returnToEntry()
                     } else {
                         ShareSaveScreen(
                             pages = exportPages,
@@ -2042,7 +2036,7 @@ private fun ScannerFlowScreen(
                             onExportTxt = { exportOcrTxt() }
                         )
                     } else {
-                        returnToHome()
+                        returnToEntry()
                     }
                 }
 
@@ -2098,7 +2092,7 @@ private fun ScannerFlowScreen(
                             }
                         )
                     } else {
-                        returnToHome()
+                        returnToEntry()
                     }
                 }
 
@@ -2117,27 +2111,27 @@ private fun ScannerFlowScreen(
                             onSaveImage = { shareSinglePage(page, ExportFileType.PNG) }
                         )
                     } else {
-                        returnToHome()
+                        returnToEntry()
                     }
                 }
                 
                 ScanStage.WatermarkTool -> {
-                    cn.yuandianai.juziscan.scan.ui.WatermarkToolScreen(onBack = { returnToHome() })
+                    cn.yuandianai.juziscan.scan.ui.WatermarkToolScreen(onBack = { returnToEntry() }, openPickerOnEntry = entryReturnStage == ScanStage.AllTools)
                 }
                 ScanStage.ImageStitchTool -> {
-                    cn.yuandianai.juziscan.scan.ui.ImageStitchToolScreen(onBack = { returnToHome() })
+                    cn.yuandianai.juziscan.scan.ui.ImageStitchToolScreen(onBack = { returnToEntry() }, openPickerOnEntry = entryReturnStage == ScanStage.AllTools)
                 }
                 ScanStage.ImageToPdfTool -> {
-                    cn.yuandianai.juziscan.scan.ui.ImageToPdfToolScreen(onBack = { returnToHome() })
+                    cn.yuandianai.juziscan.scan.ui.ImageToPdfToolScreen(onBack = { returnToEntry() }, openPickerOnEntry = entryReturnStage == ScanStage.AllTools)
                 }
                 ScanStage.ImageCompressTool -> {
-                    cn.yuandianai.juziscan.scan.ui.ImageCompressToolScreen(onBack = { returnToHome() })
+                    cn.yuandianai.juziscan.scan.ui.ImageCompressToolScreen(onBack = { returnToEntry() }, openPickerOnEntry = entryReturnStage == ScanStage.AllTools)
                 }
                 ScanStage.QrCodeTool -> {
-                    cn.yuandianai.juziscan.scan.ui.QrCodeToolScreen(onBack = { returnToHome() })
+                    cn.yuandianai.juziscan.scan.ui.QrCodeToolScreen(onBack = { returnToEntry() })
                 }
                 ScanStage.WiFiTransferTool -> {
-                    cn.yuandianai.juziscan.scan.ui.WiFiTransferToolScreen(onBack = { returnToHome() })
+                    cn.yuandianai.juziscan.scan.ui.WiFiTransferToolScreen(onBack = { returnToEntry() })
                 }
                 ScanStage.Vip -> {
                     cn.yuandianai.juziscan.scan.ui.VipScreen(
@@ -2204,6 +2198,7 @@ private fun ScannerFlowScreen(
                                             captureMode == boundMode && !isCapturing && !isProcessingPreview &&
                                             lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)
                                     },
+                                    onCameraBound = { boundCamera = it },
                                     onAutoCaptureRequest = {
                                         if (bindingActive.get() && stage == ScanStage.Capture &&
                                             boundMode == CaptureModeOption.Auto &&
@@ -2216,6 +2211,7 @@ private fun ScannerFlowScreen(
                                     }
                                 )
                             }.onFailure { error ->
+                                boundCamera = null
                                 imageCapture = null
                                 Log.e("JuZiScan", "Camera binding failed", error)
                                 Toast.makeText(context, "相机启动失败，请返回后重试", Toast.LENGTH_SHORT).show()
@@ -2227,6 +2223,8 @@ private fun ScannerFlowScreen(
 
                 onDispose {
                     bindingActive.set(false)
+                    boundCamera?.cameraControl?.enableTorch(false)
+                    boundCamera = null
                     imageCapture = null
                     if (cameraProviderFuture != null) {
                         runCatching { cameraProviderFuture.get().unbindAll() }
@@ -2264,15 +2262,16 @@ private fun ScannerFlowScreen(
             }
             if (showExitDialog) {
                 ExitConfirmationDialog(
+                    returnLabel = if (entryReturnStage == ScanStage.AllTools) "暂存并返回全部工具" else "暂存并返回首页",
                     onDismiss = { showExitDialog = false },
                     onRescan = {
                         showExitDialog = false
                         documentSaver.detach(currentDocumentRecordId)
-                        startEntry(currentTask.entry, openCapture = true)
+                        startEntry(currentTask.entry, openCapture = true, returnStage = entryReturnStage)
                     },
                     onReturnHome = {
                         showExitDialog = false
-                        if (currentTask == CaptureTask.Document) finishDocument() else returnToHome()
+                        if (currentTask == CaptureTask.Document) finishDocument() else returnToEntry()
                     }
                 )
             }
@@ -2570,6 +2569,7 @@ private fun PreviewLoadingScreen() {
 
 @Composable
 private fun ExitConfirmationDialog(
+    returnLabel: String,
     onDismiss: () -> Unit,
     onRescan: () -> Unit,
     onReturnHome: () -> Unit
@@ -2595,7 +2595,7 @@ private fun ExitConfirmationDialog(
                         .background(Color(0xFFFFECEB), CircleShape),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text(text = "⚠️", fontSize = 28.sp)
+                    FireflyIcon(FireflyIconName.Warning, size = 28.dp, tint = androidx.compose.material3.MaterialTheme.colorScheme.error, contentDescription = null)
                 }
 
                 Text(
@@ -2638,7 +2638,7 @@ private fun ExitConfirmationDialog(
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        text = "暂存并返回首页",
+                        text = returnLabel,
                         color = Color(0xFFFF4D4F),
                         fontSize = 14.sp,
                         fontWeight = FontWeight.Medium

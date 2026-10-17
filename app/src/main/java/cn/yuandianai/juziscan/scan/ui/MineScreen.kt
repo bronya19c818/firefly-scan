@@ -1,7 +1,6 @@
 package cn.yuandianai.juziscan.scan.ui
 
 import android.graphics.BitmapFactory
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -29,11 +28,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.foundation.border
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
@@ -50,6 +47,8 @@ import java.util.TimeZone
 import java.net.URL
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import cn.yuandianai.juziscan.common.FireflyIcon
+import cn.yuandianai.juziscan.common.FireflyIconName
 
 @Composable
 fun MineScreen(
@@ -116,12 +115,13 @@ fun MineScreen(
                             contentScale = ContentScale.Crop
                         )
                     } else {
-                        Text(
-                            text = if (isVip) "♛" else if (isLoggedIn) displayName.take(1) else "登录",
-                            color = if (isVip) Color(0xFF5A3B00) else Color(0xFF64748B),
-                            fontSize = if (isVip) 28.sp else 16.sp,
-                            fontWeight = if (isVip) FontWeight.Bold else FontWeight.Normal
-                        )
+                        if (isVip) {
+                            FireflyIcon(FireflyIconName.Crown, size = 32.dp, tint = FireflyColors.VipGoldText)
+                        } else if (isLoggedIn) {
+                            Text(text = displayName.take(1), color = FireflyColors.SecondaryText, fontSize = 16.sp)
+                        } else {
+                            FireflyIcon(FireflyIconName.User, size = 32.dp, tint = FireflyColors.SecondaryText, contentDescription = "登录")
+                        }
                     }
                 }
                 Spacer(modifier = Modifier.width(18.dp))
@@ -141,7 +141,7 @@ fun MineScreen(
                         )
                         if (isVip) {
                             Spacer(modifier = Modifier.width(6.dp))
-                            CrownIcon(modifier = Modifier.size(18.dp, 15.dp))
+                            FireflyIcon(FireflyIconName.Crown, tint = FireflyColors.VipGold, modifier = Modifier.size(20.dp))
                         }
                     }
                     Text(
@@ -178,7 +178,7 @@ fun MineScreen(
                     modifier = Modifier.weight(1f)
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        CrownIcon(modifier = Modifier.size(20.dp, 17.dp))
+                        FireflyIcon(FireflyIconName.Crown, tint = FireflyColors.VipGold, modifier = Modifier.size(20.dp))
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(
                             text = if (isVip) "高级会员 · 尊享权益" else "开通高级会员",
@@ -229,7 +229,7 @@ fun MineScreen(
                 .padding(horizontal = 18.dp, vertical = 8.dp)
         ) {
             MenuItem(title = "全部文档", onClick = onViewAllDocsClick) {
-                DocGlyph(color = FireflyColors.Primary, modifier = Modifier.size(21.dp))
+                FireflyIcon(FireflyIconName.Document, contentDescription = null, tint = FireflyColors.Primary, modifier = Modifier.size(21.dp))
             }
             MenuDivider()
             MenuItem(title = "应用设置", onClick = onSettingsClick) {
@@ -237,7 +237,7 @@ fun MineScreen(
             }
             MenuDivider()
             MenuItem(title = "账号与安全", onClick = onAccountSecurityClick) {
-                ShieldGlyph(color = FireflyColors.Primary, modifier = Modifier.size(21.dp))
+                FireflyIcon(FireflyIconName.Shield, contentDescription = null, tint = FireflyColors.Primary, modifier = Modifier.size(21.dp))
             }
         }
     }
@@ -307,60 +307,7 @@ private fun MenuItem(
                 fontWeight = FontWeight.Medium
             )
         }
-        RightChevronIcon(color = FireflyColors.Stroke, modifier = Modifier.size(16.dp))
-    }
-}
-
-/** 文档图标：圆角折角文档 + 行线 */
-@Composable
-private fun DocGlyph(color: Color, modifier: Modifier = Modifier) {
-    Canvas(modifier = modifier) {
-        val w = size.width
-        val h = size.height
-        val stroke = 1.9.dp.toPx()
-        val r = 3.dp.toPx()
-        val path = Path().apply {
-            moveTo(w * 0.22f, h * 0.14f)
-            lineTo(w * 0.62f, h * 0.14f)
-            lineTo(w * 0.78f, h * 0.32f)
-            lineTo(w * 0.78f, h * 0.86f)
-            lineTo(w * 0.22f, h * 0.86f)
-            close()
-        }
-        drawPath(path, color, style = androidx.compose.ui.graphics.drawscope.Stroke(width = stroke, join = androidx.compose.ui.graphics.StrokeJoin.Round))
-        val fold = Path().apply {
-            moveTo(w * 0.62f, h * 0.14f)
-            lineTo(w * 0.62f, h * 0.32f)
-            lineTo(w * 0.78f, h * 0.32f)
-        }
-        drawPath(fold, color, style = androidx.compose.ui.graphics.drawscope.Stroke(width = stroke, join = androidx.compose.ui.graphics.StrokeJoin.Round))
-        for (i in 0..1) {
-            val y = h * (0.48f + i * 0.16f)
-            drawLine(color, Offset(w * 0.32f, y), Offset(w * 0.62f, y), stroke, cap = androidx.compose.ui.graphics.StrokeCap.Round)
-        }
-    }
-}
-
-/** 盾牌图标：账号与安全 */
-@Composable
-private fun ShieldGlyph(color: Color, modifier: Modifier = Modifier) {
-    Canvas(modifier = modifier) {
-        val w = size.width
-        val h = size.height
-        val stroke = 1.9.dp.toPx()
-        val path = Path().apply {
-            moveTo(w * 0.5f, h * 0.10f)
-            lineTo(w * 0.84f, h * 0.24f)
-            lineTo(w * 0.84f, h * 0.54f)
-            quadraticTo(w * 0.84f, h * 0.78f, w * 0.5f, h * 0.90f)
-            quadraticTo(w * 0.16f, h * 0.78f, w * 0.16f, h * 0.54f)
-            lineTo(w * 0.16f, h * 0.24f)
-            close()
-        }
-        drawPath(path, color, style = androidx.compose.ui.graphics.drawscope.Stroke(width = stroke, join = androidx.compose.ui.graphics.StrokeJoin.Round))
-        // 对勾
-        drawLine(color, Offset(w * 0.36f, h * 0.50f), Offset(w * 0.47f, h * 0.62f), stroke, cap = androidx.compose.ui.graphics.StrokeCap.Round)
-        drawLine(color, Offset(w * 0.47f, h * 0.62f), Offset(w * 0.66f, h * 0.38f), stroke, cap = androidx.compose.ui.graphics.StrokeCap.Round)
+        FireflyIcon(FireflyIconName.ChevronRight, contentDescription = null, tint = FireflyColors.SecondaryText, modifier = Modifier.size(20.dp))
     }
 }
 
@@ -373,72 +320,4 @@ private fun MenuDivider() {
             .height(1.dp)
             .background(FireflyColors.Stroke)
     )
-}
-
-@Composable
-private fun RightChevronIcon(color: Color, modifier: Modifier = Modifier) {
-    Canvas(modifier = modifier) {
-        val path = Path().apply {
-            moveTo(size.width * 0.35f, size.height * 0.15f)
-            lineTo(size.width * 0.7f, size.height * 0.5f)
-            lineTo(size.width * 0.35f, size.height * 0.85f)
-        }
-        drawPath(
-            path = path,
-            color = color,
-            style = androidx.compose.ui.graphics.drawscope.Stroke(
-                width = 2.dp.toPx(),
-                cap = androidx.compose.ui.graphics.StrokeCap.Round,
-                join = androidx.compose.ui.graphics.StrokeJoin.Round
-            )
-        )
-    }
-}
-
-@Composable
-private fun CrownIcon(modifier: Modifier = Modifier) {
-    Canvas(modifier = modifier) {
-        val width = size.width
-        val height = size.height
-
-        // A classic crown shape Path
-        val path = Path().apply {
-            moveTo(width * 0.15f, height * 0.8f) // bottom left
-            lineTo(width * 0.05f, height * 0.35f) // left tip
-            lineTo(width * 0.35f, height * 0.55f) // inner left valley
-            lineTo(width * 0.5f, height * 0.2f)   // middle tip (higher)
-            lineTo(width * 0.65f, height * 0.55f) // inner right valley
-            lineTo(width * 0.95f, height * 0.35f) // right tip
-            lineTo(width * 0.85f, height * 0.8f) // bottom right
-            close()
-        }
-
-        val goldGradient = Brush.linearGradient(
-            colors = listOf(Color(0xFFFFF099), Color(0xFFD89B27))
-        )
-
-        drawPath(
-            path = path,
-            brush = goldGradient
-        )
-
-        // Bottom band
-        val baseBar = Path().apply {
-            moveTo(width * 0.15f, height * 0.83f)
-            lineTo(width * 0.85f, height * 0.83f)
-            lineTo(width * 0.83f, height * 0.93f)
-            lineTo(width * 0.17f, height * 0.93f)
-            close()
-        }
-        drawPath(
-            path = baseBar,
-            brush = goldGradient
-        )
-
-        // Jewels at the tips
-        val jewelColor = Color(0xFFFFF7C2)
-        drawCircle(color = jewelColor, radius = width * 0.05f, center = Offset(width * 0.05f, height * 0.35f))
-        drawCircle(color = jewelColor, radius = width * 0.07f, center = Offset(width * 0.5f, height * 0.2f))
-        drawCircle(color = jewelColor, radius = width * 0.05f, center = Offset(width * 0.95f, height * 0.35f))
-    }
 }

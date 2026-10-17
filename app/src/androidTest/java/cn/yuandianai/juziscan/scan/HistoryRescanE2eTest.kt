@@ -116,14 +116,14 @@ class HistoryRescanE2eTest {
             val ordered = repository.loadDocumentPages(record.id).map { it.id }
             assertEquals(originalIds.toSet(), ordered.toSet())
             ui.waitUntil(60_000) { ui.onAllNodesWithText("正在", substring = true).fetchSemanticsNodes().isEmpty() }
-            ui.onNodeWithText("···").performTouchInput { click() }
+            ui.onNodeWithContentDescription("更多操作").performTouchInput { click() }
             ui.onNodeWithText("编辑").performTouchInput { click() }
             ui.waitUntil(60_000) { ui.onAllNodesWithText("检测边缘").fetchSemanticsNodes().isNotEmpty() }
             // Cancel must preserve the committed record and its timestamp.
             val beforeCancel = repository.loadRecords().first { it.id == record.id }
             instrumentation.runOnMainSync { ui.activity.onBackPressedDispatcher.onBackPressed() }
             assertEquals(beforeCancel, repository.loadRecords().first { it.id == record.id })
-            ui.onNodeWithText("···").performTouchInput { click() }
+            ui.onNodeWithContentDescription("更多操作").performTouchInput { click() }
             ui.onNodeWithText("编辑").performTouchInput { click() }
             ui.waitUntil(60_000) { ui.onAllNodesWithText("铺满").fetchSemanticsNodes().isNotEmpty() }
             ui.onNodeWithText("铺满").performTouchInput { click() }
@@ -137,7 +137,7 @@ class HistoryRescanE2eTest {
             evidence("reordered-cropped")
             for (remaining in 2 downTo 0) {
                 ui.waitUntil(60_000) { ui.onAllNodesWithText("正在", substring = true).fetchSemanticsNodes().isEmpty() }
-                ui.onNodeWithText("···").performTouchInput { click() }
+                ui.onNodeWithContentDescription("更多操作").performTouchInput { click() }
                 ui.onNodeWithText("删除").performTouchInput { click() }
                 ui.waitUntil(60_000) {
                     val saved = repository.loadRecords().firstOrNull { it.id == record.id }

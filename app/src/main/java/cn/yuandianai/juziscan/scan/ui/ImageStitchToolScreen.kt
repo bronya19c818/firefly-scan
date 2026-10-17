@@ -33,15 +33,17 @@ import cn.yuandianai.juziscan.ui.theme.HpSmartColors
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import cn.yuandianai.juziscan.common.FireflyIconName
 
 @Composable
-fun ImageStitchToolScreen(onBack: () -> Unit) {
+fun ImageStitchToolScreen(onBack: () -> Unit, openPickerOnEntry: Boolean = false) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
     var sourceBitmaps by remember { mutableStateOf<List<Bitmap>>(emptyList()) }
     var stitchedBitmap by remember { mutableStateOf<Bitmap?>(null) }
     var isProcessing by remember { mutableStateOf(false) }
+    var pickerRequest by remember { mutableIntStateOf(0) }
 
     val photoPickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickMultipleVisualMedia()
@@ -51,12 +53,12 @@ fun ImageStitchToolScreen(onBack: () -> Unit) {
             scope.launch {
                 val loadedBitmaps = withContext(Dispatchers.IO) {
                     uris.mapNotNull { uri ->
-                        loadBitmapFromUri(context, uri)
+                        runCatching { loadBitmapFromUri(context, uri) }.getOrNull()
                     }
                 }
                 
-                if (loadedBitmaps.isEmpty()) {
-                    Toast.makeText(context, "图片加载失败", Toast.LENGTH_SHORT).show()
+                if (loadedBitmaps.size != uris.size) {
+                    Toast.makeText(context, "部分图片无法读取，请重新选择", Toast.LENGTH_SHORT).show()
                 } else if (loadedBitmaps.size == 1) {
                     Toast.makeText(context, "请至少选择 2 张图片进行拼接", Toast.LENGTH_SHORT).show()
                 } else {
@@ -66,8 +68,13 @@ fun ImageStitchToolScreen(onBack: () -> Unit) {
                     }
                 }
                 isProcessing = false
+                if (openPickerOnEntry && stitchedBitmap == null) pickerRequest++
             }
-        }
+        } else if (openPickerOnEntry && stitchedBitmap == null) onBack()
+    }
+
+    LaunchedEffect(pickerRequest) {
+        if (openPickerOnEntry) photoPickerLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
     }
 
     Column(
@@ -79,8 +86,8 @@ fun ImageStitchToolScreen(onBack: () -> Unit) {
         ToolHeader(title = "长图拼接", onBack = onBack)
 
         if (stitchedBitmap == null && !isProcessing) {
-            ToolEmptyState(
-                imageRes = R.drawable.tool_stitch,
+            if (!openPickerOnEntry) ToolEmptyState(
+                icon = FireflyIconName.Stitch,
                 title = "长图拼接",
                 message = "一次选择多张图片，自动按顺序拼接成长图，适合聊天截图和内容归档。",
                 actionText = "从相册选择",

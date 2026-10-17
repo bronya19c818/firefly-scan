@@ -1,0 +1,321 @@
+[
+  {
+    "file": "app/src/main/java/cn/yuandianai/juziscan/MainActivity.kt",
+    "before": []
+  },
+  {
+    "file": "app/src/main/java/cn/yuandianai/juziscan/common/Icons.kt",
+    "before": [
+      "fun BackArrowIcon(color: Color, modifier: Modifier = Modifier) {",
+      "Canvas(modifier = modifier) {",
+      "fun CloseCrossIcon(color: Color, modifier: Modifier = Modifier) {",
+      "Canvas(modifier = modifier) {",
+      "fun FlashModeIcon(",
+      "Canvas(modifier = modifier) {",
+      "fun SettingsGearIcon(color: Color, modifier: Modifier = Modifier) {",
+      "Canvas(modifier = modifier) {",
+      "fun GalleryPhotoIcon(color: Color, modifier: Modifier = Modifier) {",
+      "Canvas(modifier = modifier) {",
+      "fun PlusIcon(color: Color, modifier: Modifier = Modifier) {",
+      "Canvas(modifier = modifier) {",
+      "fun RotateArrowIcon(color: Color, modifier: Modifier = Modifier) {",
+      "Canvas(modifier = modifier) {",
+      "fun CropIcon(color: Color, modifier: Modifier = Modifier) {",
+      "Canvas(modifier = modifier) {",
+      "fun ExpandIcon(color: Color, modifier: Modifier = Modifier) {",
+      "Canvas(modifier = modifier) {",
+      "fun ShareUploadIcon(color: Color, modifier: Modifier = Modifier) {",
+      "Canvas(modifier = modifier) {",
+      "fun RetakeRefreshIcon(color: Color, modifier: Modifier = Modifier) {",
+      "Canvas(modifier = modifier) {",
+      "fun BlueCheckIcon(modifier: Modifier = Modifier) {",
+      "Canvas(modifier = modifier) {",
+      "fun ChevronRightIcon(color: Color, modifier: Modifier = Modifier) {",
+      "Canvas(modifier = modifier) {",
+      "fun PrintIcon(color: Color, modifier: Modifier = Modifier) {",
+      "Canvas(modifier = modifier) {",
+      "fun ReorderIcon(color: Color, modifier: Modifier = Modifier) {",
+      "Canvas(modifier = modifier) {",
+      "fun PencilIcon(color: Color, modifier: Modifier = Modifier) {",
+      "Canvas(modifier = modifier) {",
+      "fun ReplaceArrowsIcon(color: Color, modifier: Modifier = Modifier) {",
+      "Canvas(modifier = modifier) {",
+      "fun TrashBinIcon(color: Color, modifier: Modifier = Modifier) {",
+      "Canvas(modifier = modifier) {"
+    ]
+  },
+  {
+    "file": "app/src/main/java/cn/yuandianai/juziscan/history/HistoryScreen.kt",
+    "before": []
+  },
+  {
+    "file": "app/src/main/java/cn/yuandianai/juziscan/privacy/PrivacyConsent.kt",
+    "before": []
+  },
+  {
+    "file": "app/src/main/java/cn/yuandianai/juziscan/scan/ScanFlow.kt",
+    "before": [
+      "CameraPermissionGlyph(",
+      "Canvas(modifier = Modifier.size(12.dp)) {",
+      "private fun CameraPermissionGlyph(",
+      "Canvas(modifier = modifier) {"
+    ]
+  },
+  {
+    "file": "app/src/main/java/cn/yuandianai/juziscan/settings/AccountSecurityScreen.kt",
+    "before": [
+      "if (showChevron) Text(\"  ›\", color = Color(0xFFC7D0DF), fontSize = 23.sp)"
+    ]
+  },
+  {
+    "file": "app/src/main/java/cn/yuandianai/juziscan/settings/SettingsScreen.kt",
+    "before": [
+      "if (showChevron) Text(\"  ›\", color = Color(0xFFC7D0DF), fontSize = 23.sp)"
+    ]
+  },
+  {
+    "file": "app/src/main/java/cn/yuandianai/juziscan/ui/theme/Theme.kt",
+    "before": []
+  },
+  {
+    "file": "app/src/main/java/cn/yuandianai/juziscan/scan/ui/AllDocumentsScreen.kt",
+    "before": []
+  },
+  {
+    "file": "app/src/main/java/cn/yuandianai/juziscan/scan/ui/AllToolsScreen.kt",
+    "before": [
+      "val imageRes = tool.imageRes"
+    ]
+  },
+  {
+    "file": "app/src/main/java/cn/yuandianai/juziscan/scan/ui/AuthDialog.kt",
+    "before": []
+  },
+  {
+    "file": "app/src/main/java/cn/yuandianai/juziscan/scan/ui/BindPhoneDialog.kt",
+    "before": []
+  },
+  {
+    "file": "app/src/main/java/cn/yuandianai/juziscan/scan/ui/CaptureScreen.kt",
+    "before": [
+      "BackArrowIcon(color = HpSmartColors.CameraText, modifier = Modifier.size(22.dp))",
+      "CloseCrossIcon(color = HpSmartColors.CameraText, modifier = Modifier.size(22.dp))",
+      "FlashModeIcon(",
+      "GalleryPhotoIcon(color = Color.White, modifier = Modifier.size(42.dp))",
+      "Canvas(modifier = modifier) {",
+      "Canvas(modifier = modifier) {",
+      "val points = quad.map { normalizedToCanvas(it, previewRect) }",
+      "PlusIcon(color = Color.White, modifier = Modifier.size(16.dp))",
+      "CloseCrossIcon(color = Color.White, modifier = Modifier.size(18.dp))",
+      "Canvas(modifier = Modifier.matchParentSize()) {"
+    ]
+  },
+  {
+    "file": "app/src/main/java/cn/yuandianai/juziscan/scan/ui/DocumentStyleScreen.kt",
+    "before": []
+  },
+  {
+    "file": "app/src/main/java/cn/yuandianai/juziscan/scan/ui/EdgeReviewScreen.kt",
+    "before": [
+      "CropIcon(color = color, modifier = Modifier.size(22.dp))",
+      "ExpandIcon(color = color, modifier = Modifier.size(22.dp))",
+      "Canvas(",
+      "val points = currentQuad.map { normalizedToCanvas(it, imageRect) }",
+      "val current = normalizedToCanvas(quadSnapshot[draggingIndex], imageRect)",
+      "val points = quad.map { normalizedToCanvas(it, imageRect) }"
+    ]
+  },
+  {
+    "file": "app/src/main/java/cn/yuandianai/juziscan/scan/ui/FeedbackDialog.kt",
+    "before": []
+  },
+  {
+    "file": "app/src/main/java/cn/yuandianai/juziscan/scan/ui/FireflyComponents.kt",
+    "before": [
+      "BackArrowIcon(color = FireflyColors.Ink, modifier = Modifier.size(22.dp))",
+      "text = \"›\",",
+      "FireflySparkGlyph(color = FireflyColors.Mint, modifier = Modifier.size(30.dp))",
+      "fun FireflySparkGlyph(color: Color, modifier: Modifier = Modifier) {",
+      "androidx.compose.foundation.Canvas(modifier = modifier) {"
+    ]
+  },
+  {
+    "file": "app/src/main/java/cn/yuandianai/juziscan/scan/ui/HistoryDocumentComponents.kt",
+    "before": [
+      "ShareUploadIcon(color = FireflyColors.Primary, modifier = Modifier.size(15.dp))",
+      "TrashBinIcon(color = FireflyColors.Error, modifier = Modifier.size(15.dp))"
+    ]
+  },
+  {
+    "file": "app/src/main/java/cn/yuandianai/juziscan/scan/ui/HomeScreen.kt",
+    "before": [
+      "CrownGlyph(color = FireflyColors.VipGold, modifier = Modifier.size(13.dp))",
+      "private fun CrownGlyph(color: Color, modifier: Modifier = Modifier) {",
+      "Canvas(modifier = modifier) {",
+      "ScanCameraGlyph(color = Color.White, modifier = Modifier.size(46.dp))",
+      "private fun ScanCameraGlyph(color: Color, modifier: Modifier = Modifier) {",
+      "Canvas(modifier = modifier) {",
+      "IdCardGlyph(c, m)",
+      "TextScanGlyph(c, m)",
+      "GalleryGlyph(c, m)",
+      "GridGlyph(c, m)",
+      "private fun IdCardGlyph(color: Color, modifier: Modifier = Modifier) {",
+      "Canvas(modifier = modifier) {",
+      "private fun TextScanGlyph(color: Color, modifier: Modifier = Modifier) {",
+      "Canvas(modifier = modifier) {",
+      "private fun GalleryGlyph(color: Color, modifier: Modifier = Modifier) {",
+      "Canvas(modifier = modifier) {",
+      "private fun GridGlyph(color: Color, modifier: Modifier = Modifier) {",
+      "Canvas(modifier = modifier) {",
+      "HomeGlyph(color = navColor(active), modifier = Modifier.size(24.dp))",
+      "ProfileGlyph(color = navColor(active), modifier = Modifier.size(24.dp))",
+      "ScanLineGlyph(color = Color.White, modifier = Modifier.size(28.dp))",
+      "private fun HomeGlyph(color: Color, modifier: Modifier = Modifier) {",
+      "Canvas(modifier = modifier) {",
+      "private fun ProfileGlyph(color: Color, modifier: Modifier = Modifier) {",
+      "Canvas(modifier = modifier) {",
+      "private fun ScanLineGlyph(color: Color, modifier: Modifier = Modifier) {",
+      "Canvas(modifier = modifier) {"
+    ]
+  },
+  {
+    "file": "app/src/main/java/cn/yuandianai/juziscan/scan/ui/ImageCompressToolScreen.kt",
+    "before": [
+      "imageRes = R.drawable.tool_compress,"
+    ]
+  },
+  {
+    "file": "app/src/main/java/cn/yuandianai/juziscan/scan/ui/ImageStitchToolScreen.kt",
+    "before": [
+      "imageRes = R.drawable.tool_stitch,",
+      "val canvas = Canvas(resultBitmap)"
+    ]
+  },
+  {
+    "file": "app/src/main/java/cn/yuandianai/juziscan/scan/ui/ImageToPdfToolScreen.kt",
+    "before": [
+      "imageRes = R.drawable.tool_image_to_pdf,"
+    ]
+  },
+  {
+    "file": "app/src/main/java/cn/yuandianai/juziscan/scan/ui/LegalDocumentScreen.kt",
+    "before": [
+      "BackArrowIcon("
+    ]
+  },
+  {
+    "file": "app/src/main/java/cn/yuandianai/juziscan/scan/ui/MineScreen.kt",
+    "before": [
+      "text = if (isVip) \"♛\" else if (isLoggedIn) displayName.take(1) else \"登录\",",
+      "CrownIcon(modifier = Modifier.size(18.dp, 15.dp))",
+      "CrownIcon(modifier = Modifier.size(20.dp, 17.dp))",
+      "DocGlyph(color = FireflyColors.Primary, modifier = Modifier.size(21.dp))",
+      "SettingsGearIcon(color = FireflyColors.Primary, modifier = Modifier.size(21.dp))",
+      "ShieldGlyph(color = FireflyColors.Primary, modifier = Modifier.size(21.dp))",
+      "RightChevronIcon(color = FireflyColors.Stroke, modifier = Modifier.size(16.dp))",
+      "private fun DocGlyph(color: Color, modifier: Modifier = Modifier) {",
+      "Canvas(modifier = modifier) {",
+      "private fun ShieldGlyph(color: Color, modifier: Modifier = Modifier) {",
+      "Canvas(modifier = modifier) {",
+      "private fun RightChevronIcon(color: Color, modifier: Modifier = Modifier) {",
+      "Canvas(modifier = modifier) {",
+      "private fun CrownIcon(modifier: Modifier = Modifier) {",
+      "Canvas(modifier = modifier) {"
+    ]
+  },
+  {
+    "file": "app/src/main/java/cn/yuandianai/juziscan/scan/ui/PreviewScreen.kt",
+    "before": [
+      "PlusIcon(color = HpSmartColors.TextPrimary, modifier = Modifier.size(16.dp))",
+      "ReorderIcon(color = HpSmartColors.TextPrimary, modifier = Modifier.size(16.dp))",
+      "RotateArrowIcon(color = HpSmartColors.TextPrimary, modifier = Modifier.size(16.dp))",
+      "PrintIcon(color = color, modifier = Modifier.size(22.dp))",
+      "ShareUploadIcon(color = color, modifier = Modifier.size(22.dp))",
+      "PopupMenuItem(text = \"编辑\", icon = { PencilIcon(color = HpSmartColors.Accent, modifier = Modifier.size(16.dp)) }, onClick = onEdit)",
+      "PopupMenuItem(text = \"更换\", icon = { ReplaceArrowsIcon(color = HpSmartColors.Accent, modifier = Modifier.size(16.dp)) }, onClick = onReplace)",
+      "PopupMenuItem(text = \"删除\", icon = { TrashBinIcon(color = HpSmartColors.Accent, modifier = Modifier.size(16.dp)) }, onClick = onDelete)"
+    ]
+  },
+  {
+    "file": "app/src/main/java/cn/yuandianai/juziscan/scan/ui/ProfileEditDialog.kt",
+    "before": []
+  },
+  {
+    "file": "app/src/main/java/cn/yuandianai/juziscan/scan/ui/QrCodeToolScreen.kt",
+    "before": [
+      "imageRes = R.drawable.tool_qrcode,",
+      "imageRes = R.drawable.tool_qrcode,"
+    ]
+  },
+  {
+    "file": "app/src/main/java/cn/yuandianai/juziscan/scan/ui/ReorderScreen.kt",
+    "before": [
+      "CloseCrossIcon(color = Color.White, modifier = Modifier.size(10.dp))"
+    ]
+  },
+  {
+    "file": "app/src/main/java/cn/yuandianai/juziscan/scan/ui/ScanComponents.kt",
+    "before": [
+      "BackArrowIcon(",
+      "Canvas(modifier = Modifier.fillMaxSize()) {",
+      "CloseCrossIcon(color = Color.White, modifier = Modifier.size(16.dp))",
+      "BackArrowIcon(",
+      "Canvas(",
+      "Canvas(",
+      "fun normalizedToCanvas(point: PointF, imageRect: Rect): Offset {"
+    ]
+  },
+  {
+    "file": "app/src/main/java/cn/yuandianai/juziscan/scan/ui/ShareSaveScreen.kt",
+    "before": [
+      "CloseCrossIcon(",
+      "ChevronRightIcon(",
+      "ChevronRightIcon(",
+      "BlueCheckIcon(modifier = Modifier.size(22.dp))",
+      "BlueCheckIcon(modifier = Modifier.size(22.dp))"
+    ]
+  },
+  {
+    "file": "app/src/main/java/cn/yuandianai/juziscan/scan/ui/TaskResultScreens.kt",
+    "before": [
+      "RotateArrowIcon(color = HpSmartColors.TextPrimary, modifier = Modifier.size(16.dp))",
+      "RotateArrowIcon(color = HpSmartColors.TextPrimary, modifier = Modifier.size(16.dp))"
+    ]
+  },
+  {
+    "file": "app/src/main/java/cn/yuandianai/juziscan/scan/ui/ToolScreens.kt",
+    "before": []
+  },
+  {
+    "file": "app/src/main/java/cn/yuandianai/juziscan/scan/ui/VipScreen.kt",
+    "before": [
+      "text = \"✓\",",
+      "CloseCrossIcon(color = Color.White, modifier = Modifier.size(16.dp))",
+      "Text(text = \"♛\", color = Color(0xFF5B3B00), fontSize = 34.sp, fontWeight = FontWeight.Bold)",
+      "CloseCrossIcon(",
+      "Canvas(modifier = modifier) {",
+      "Canvas(modifier = modifier) {",
+      "Canvas(modifier = modifier) {",
+      "Text(text = \"✔\", color = Color.White, fontSize = 8.sp, fontWeight = FontWeight.Bold)",
+      "Text(text = \"🛡️\", fontSize = 14.sp)",
+      "Triple(\"单页 / 多页扫描\", \"✓\", \"✓\"),",
+      "Triple(\"OCR 文字识别\", \"✓\", \"✓\"),",
+      "Triple(\"证件扫描\", \"✓\", \"✓\"),",
+      "Triple(\"本地文档整理\", \"✓\", \"✓\")",
+      "val freeColor = if (free == \"✖\") Color(0xFFEF4444) else TextGray",
+      "val vipColor = if (vip == \"✓\") Color(0xFF10B981) else Color(0xFFD4AF37)"
+    ]
+  },
+  {
+    "file": "app/src/main/java/cn/yuandianai/juziscan/scan/ui/WatermarkToolScreen.kt",
+    "before": [
+      "imageRes = R.drawable.tool_watermark,"
+    ]
+  },
+  {
+    "file": "app/src/main/java/cn/yuandianai/juziscan/scan/ui/WiFiTransferToolScreen.kt",
+    "before": [
+      "imageRes = R.drawable.tool_wifi_transfer,"
+    ]
+  }
+]

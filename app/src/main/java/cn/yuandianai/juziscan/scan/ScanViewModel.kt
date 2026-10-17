@@ -52,6 +52,7 @@ class ScanViewModel {
     var editingDocumentPage by mutableStateOf<ScannedPage?>(null)
     var documentUiSession = 0L
     var documentReturnStage by mutableStateOf(ScanStage.Home)
+    var entryReturnStage by mutableStateOf(ScanStage.Home)
     var openedFromHistory by mutableStateOf(false)
     var currentOcrRecordId by mutableStateOf<String?>(null)
     var currentIdCardRecordId by mutableStateOf<String?>(null)
@@ -112,7 +113,7 @@ class ScanViewModel {
         }
     }
 
-    fun startEntry(entry: ScanEntry, openCapture: Boolean = true) {
+    fun startEntry(entry: ScanEntry, openCapture: Boolean = true, returnStage: ScanStage = ScanStage.Home) {
         documentUiSession++
         isCapturing = false
         isProcessingPreview = false
@@ -134,7 +135,8 @@ class ScanViewModel {
         selectedIdCardLayout = IdCardLayoutOption.VerticalPair
         currentDocumentRecordId = if (entry == ScanEntry.Document) java.util.UUID.randomUUID().toString() else null
         openedFromHistory = false
-        documentReturnStage = ScanStage.Home
+        entryReturnStage = returnStage
+        documentReturnStage = returnStage
         currentOcrRecordId = null
         currentIdCardRecordId = null
         clearEditingState()
@@ -156,6 +158,12 @@ class ScanViewModel {
             ScanEntry.WiFiTransfer -> ScanStage.WiFiTransferTool
             else -> if (openCapture) ScanStage.Capture else ScanStage.Home
         }
+    }
+
+    fun returnToEntry() {
+        val origin = entryReturnStage
+        returnToHome()
+        stage = origin
     }
 
     fun returnToHome() {
@@ -181,6 +189,7 @@ class ScanViewModel {
         currentDocumentRecordId = null
         openedFromHistory = false
         documentReturnStage = ScanStage.Home
+        entryReturnStage = ScanStage.Home
         currentOcrRecordId = null
         currentIdCardRecordId = null
         clearEditingState()

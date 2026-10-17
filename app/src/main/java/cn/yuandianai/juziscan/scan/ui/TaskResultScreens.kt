@@ -80,7 +80,7 @@ fun OcrResultScreen(
                     onClick = onRetryRecognition,
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    RotateArrowIcon(color = HpSmartColors.TextPrimary, modifier = Modifier.size(16.dp))
+                    RotateArrowIcon(color = HpSmartColors.TextPrimary, modifier = Modifier.size(20.dp))
                 }
             }
         }
@@ -291,7 +291,7 @@ fun IdCardResultScreen(
                     onClick = onRotate,
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    RotateArrowIcon(color = HpSmartColors.TextPrimary, modifier = Modifier.size(16.dp))
+                    RotateArrowIcon(color = HpSmartColors.TextPrimary, modifier = Modifier.size(20.dp))
                 }
             }
         }
