@@ -40,10 +40,10 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import cn.yuandianai.juziscan.R
-import cn.yuandianai.juziscan.common.GalleryPhotoIcon
 import cn.yuandianai.juziscan.history.HistoryRecord
 import cn.yuandianai.juziscan.payment.MembershipStatus
 import cn.yuandianai.juziscan.scan.HomeTab
@@ -188,7 +188,7 @@ private fun HomeBrandBar(
                 painter = painterResource(R.drawable.firefly_logo_badge),
                 contentDescription = "萤火Scan",
                 contentScale = ContentScale.Fit,
-                modifier = Modifier.size(42.dp)
+                modifier = Modifier.size(44.dp)
             )
             Column {
                 Text(
@@ -260,70 +260,35 @@ private fun HomeTitleSection() {
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 20.dp)
-            .padding(top = 10.dp),
-        verticalAlignment = Alignment.CenterVertically
+            .padding(top = 6.dp),
+        verticalAlignment = Alignment.Top
     ) {
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = "让扫描\n更简单高效",
                 color = FireflyColors.Ink,
                 style = FireflyTypography.headlineLarge,
-                fontWeight = FontWeight.Bold
+                fontWeight = FontWeight.Bold,
+                maxLines = 2
             )
             Text(
                 text = "文件 · 证件 · 识别 · 轻松搞定",
                 color = FireflyColors.SecondaryText,
                 style = FireflyTypography.bodyMedium,
+                maxLines = 1,
+                overflow = TextOverflow.Clip,
                 modifier = Modifier.padding(top = 8.dp)
             )
         }
-        // 右侧淡装饰：文档叠层 + 萤火光点
-        DocStackDecoration(modifier = Modifier.size(width = 86.dp, height = 96.dp))
-    }
-}
-
-@Composable
-private fun DocStackDecoration(modifier: Modifier = Modifier) {
-    Canvas(modifier = modifier) {
-        val w = size.width
-        val h = size.height
-        val corner = 8.dp.toPx()
-        // 后方文档
-        drawRoundRect(
-            color = FireflyColors.Mint.copy(alpha = 0.35f),
-            topLeft = Offset(w * 0.30f, h * 0.02f),
-            size = androidx.compose.ui.geometry.Size(w * 0.56f, h * 0.72f),
-            cornerRadius = androidx.compose.ui.geometry.CornerRadius(corner)
-        )
-        // 前方文档
-        drawRoundRect(
-            color = FireflyColors.Mint.copy(alpha = 0.55f),
-            topLeft = Offset(w * 0.12f, h * 0.16f),
-            size = androidx.compose.ui.geometry.Size(w * 0.56f, h * 0.72f),
-            cornerRadius = androidx.compose.ui.geometry.CornerRadius(corner)
-        )
-        // 文档行线
-        val lineStroke = 2.4.dp.toPx()
-        for (i in 0..2) {
-            val y = h * (0.30f + i * 0.14f)
-            drawLine(
-                color = Color.White.copy(alpha = 0.85f),
-                start = Offset(w * 0.22f, y),
-                end = Offset(w * 0.58f, y),
-                strokeWidth = lineStroke,
-                cap = StrokeCap.Round
-            )
-        }
-        // 萤火光点
-        drawCircle(
-            color = FireflyColors.Mint.copy(alpha = 0.5f),
-            radius = w * 0.10f,
-            center = Offset(w * 0.86f, h * 0.78f)
-        )
-        drawCircle(
-            color = Color(0xFFFFF3C4),
-            radius = w * 0.055f,
-            center = Offset(w * 0.86f, h * 0.78f)
+        // 右侧定稿插画：文档叠层 + 萤火轨道（透明底，与雾白页面自然融合；
+        // 上移避让副文案，避免文字压图造成拼接感）
+        Image(
+            painter = painterResource(R.drawable.home_top_decor),
+            contentDescription = null,
+            contentScale = ContentScale.Fit,
+            modifier = Modifier
+                .width(128.dp)
+                .offset(x = 4.dp, y = (-14).dp)
         )
     }
 }
@@ -340,67 +305,30 @@ private fun MainScanCard(
         modifier = modifier
             .padding(horizontal = 20.dp)
             .fillMaxWidth()
-            .height(152.dp)
+            .height(164.dp)
+            // 薄荷青边缘发光：外发光阴影 + 细发光描边
             .shadow(
-                12.dp,
+                16.dp,
                 shape,
                 clip = false,
-                ambientColor = Color(0x33287F80),
-                spotColor = Color(0x33287F80)
+                ambientColor = Color(0x5991DCCB),
+                spotColor = Color(0x5991DCCB)
             )
             .clip(shape)
-            .background(
-                Brush.linearGradient(
-                    listOf(Color(0xFF1F6E6E), FireflyColors.Primary, Color(0xFF63C3AE))
-                )
-            )
+            .background(FireflyColors.Surface, shape)
+            .border(1.5.dp, Color(0xFF91DCCB).copy(alpha = 0.65f), shape)
             .pointerInput(Unit) { detectTapGesturesCompat(onClick) }
     ) {
-        // 萤火微光装饰（不破坏居中）
-        Canvas(modifier = Modifier.fillMaxSize()) {
-            val w = size.width
-            val h = size.height
-            // 右侧光晕
-            drawCircle(
-                color = Color.White.copy(alpha = 0.10f),
-                radius = h * 0.62f,
-                center = Offset(w * 0.88f, h * 0.55f)
-            )
-            // 萤火光点
-            drawCircle(
-                color = Color(0xFFFFF3C4).copy(alpha = 0.55f),
-                radius = h * 0.10f,
-                center = Offset(w * 0.86f, h * 0.62f)
-            )
-            drawCircle(
-                color = Color(0xFFFFF6D8),
-                radius = h * 0.045f,
-                center = Offset(w * 0.86f, h * 0.62f)
-            )
-            // 轨道弧
-            drawArc(
-                color = Color.White.copy(alpha = 0.35f),
-                startAngle = 160f,
-                sweepAngle = 130f,
-                useCenter = false,
-                topLeft = Offset(w * 0.70f, h * 0.18f),
-                size = androidx.compose.ui.geometry.Size(w * 0.34f, h * 0.85f),
-                style = Stroke(width = 1.6.dp.toPx(), cap = StrokeCap.Round)
-            )
-            // 左侧星点
-            drawCircle(
-                color = Color.White.copy(alpha = 0.45f),
-                radius = 2.dp.toPx(),
-                center = Offset(w * 0.10f, h * 0.28f)
-            )
-            drawCircle(
-                color = Color.White.copy(alpha = 0.30f),
-                radius = 1.6.dp.toPx(),
-                center = Offset(w * 0.18f, h * 0.72f)
-            )
-        }
+        // 底层：定稿微光背景插画（不透明内区，全幅铺满，边缘与卡片圆角完全重合）
+        Image(
+            painter = painterResource(R.drawable.home_scan_card_bg),
+            contentDescription = null,
+            contentScale = ContentScale.Crop,
+            alignment = Alignment.CenterEnd,
+            modifier = Modifier.fillMaxSize()
+        )
 
-        // 居中垂直组合：相机图标 + 标题 + 说明
+        // 居中垂直组合：相机图标 + 标题 + 说明（保持水平居中，不被背景视觉重心带偏）
         Column(
             modifier = Modifier.fillMaxSize(),
             horizontalAlignment = Alignment.CenterHorizontally,
@@ -416,7 +344,7 @@ private fun MainScanCard(
             )
             Text(
                 text = "拍照生成高清文档",
-                color = Color.White.copy(alpha = 0.88f),
+                color = Color.White.copy(alpha = 0.92f),
                 fontSize = 12.sp,
                 modifier = Modifier.padding(top = 4.dp)
             )
@@ -496,7 +424,7 @@ private fun QuickEntryRow(
             TextScanGlyph(c, m)
         },
         QuickEntrySpec("相册导入", FireflyColors.EntryPurple, onImportClick) { c, m ->
-            GalleryPhotoIcon(c, m)
+            GalleryGlyph(c, m)
         },
         QuickEntrySpec("更多工具", FireflyColors.EntrySlate, onMoreToolsClick) { c, m ->
             GridGlyph(c, m)
@@ -580,6 +508,46 @@ private fun TextScanGlyph(color: Color, modifier: Modifier = Modifier) {
         drawLine(color, Offset(w * 0.28f, h * 0.24f), Offset(w * 0.72f, h * 0.24f), stroke, cap = StrokeCap.Round)
         drawLine(color, Offset(w * 0.50f, h * 0.24f), Offset(w * 0.50f, h * 0.72f), stroke, cap = StrokeCap.Round)
         drawLine(color, Offset(w * 0.38f, h * 0.72f), Offset(w * 0.62f, h * 0.72f), stroke, cap = StrokeCap.Round)
+    }
+}
+
+/**
+ * 相册导入图标：与 IdCardGlyph / TextScanGlyph 同一套线宽与圆角语言，
+ * 避免与其他入口图案产生“拼接感”。
+ */
+@Composable
+private fun GalleryGlyph(color: Color, modifier: Modifier = Modifier) {
+    Canvas(modifier = modifier) {
+        val w = size.width
+        val h = size.height
+        val stroke = 2.1.dp.toPx()
+        // 外框
+        drawRoundRect(
+            color = color,
+            topLeft = Offset(w * 0.14f, h * 0.20f),
+            size = androidx.compose.ui.geometry.Size(w * 0.72f, h * 0.60f),
+            cornerRadius = androidx.compose.ui.geometry.CornerRadius(4.5.dp.toPx(), 4.5.dp.toPx()),
+            style = Stroke(width = stroke)
+        )
+        // 太阳
+        drawCircle(
+            color = color,
+            radius = w * 0.075f,
+            center = Offset(w * 0.34f, h * 0.38f)
+        )
+        // 山形（与山脊同一描边语言，圆角衔接）
+        val mountain = Path().apply {
+            moveTo(w * 0.20f, h * 0.74f)
+            lineTo(w * 0.42f, h * 0.48f)
+            lineTo(w * 0.56f, h * 0.62f)
+        }
+        drawPath(mountain, color, style = Stroke(width = stroke, cap = StrokeCap.Round, join = androidx.compose.ui.graphics.StrokeJoin.Round))
+        val hill = Path().apply {
+            moveTo(w * 0.48f, h * 0.74f)
+            lineTo(w * 0.63f, h * 0.56f)
+            lineTo(w * 0.80f, h * 0.74f)
+        }
+        drawPath(hill, color, style = Stroke(width = stroke, cap = StrokeCap.Round, join = androidx.compose.ui.graphics.StrokeJoin.Round))
     }
 }
 
