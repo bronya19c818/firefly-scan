@@ -40,6 +40,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import cn.yuandianai.juziscan.common.SettingsGearIcon
+import cn.yuandianai.juziscan.ui.theme.FireflyColors
 import cn.yuandianai.juziscan.ui.theme.HpSmartColors
 import cn.yuandianai.juziscan.payment.MembershipStatus
 import java.text.SimpleDateFormat
@@ -69,7 +71,7 @@ fun MineScreen(
     Column(
         modifier = modifier
             .fillMaxSize()
-            .background(Color(0xFFF5F8FF))
+            .background(FireflyColors.Background)
             .statusBarsPadding()
             .verticalScroll(rememberScrollState())
             .padding(horizontal = 20.dp, vertical = 20.dp)
@@ -88,9 +90,10 @@ fun MineScreen(
                         .size(68.dp)
                         .then(
                             if (isVip) {
+                                // 会员仅以细金环点缀，不大面积使用黄色
                                 Modifier.border(
                                     width = 2.dp,
-                                    brush = Brush.linearGradient(listOf(Color(0xFFFFE59A), Color(0xFFD89B27))),
+                                    brush = Brush.linearGradient(listOf(FireflyColors.VipGold, FireflyColors.VipGoldSoft)),
                                     shape = CircleShape
                                 )
                             } else {
@@ -151,21 +154,15 @@ fun MineScreen(
             }
         }
 
-        // VIP Banner
+        // VIP Banner：深湖青品牌基底，暖金仅作皇冠/按钮小面积点缀（design.md 3.1 色彩规则）
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(86.dp)
                 .background(
-                    brush = if (isVip) {
-                        Brush.horizontalGradient(
-                            listOf(Color(0xFFFFE59A), Color(0xFFD89B27))
-                        )
-                    } else {
-                        Brush.horizontalGradient(
-                            listOf(Color(0xFF323642), Color(0xFF1E212A))
-                        )
-                    },
+                    brush = Brush.linearGradient(
+                        listOf(FireflyColors.Primary, FireflyColors.PrimaryDark)
+                    ),
                     shape = RoundedCornerShape(16.dp)
                 )
                 .clickable { onVipClick() }
@@ -181,15 +178,11 @@ fun MineScreen(
                     modifier = Modifier.weight(1f)
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        if (isVip) {
-                            CrownIcon(modifier = Modifier.size(20.dp, 17.dp))
-                        } else {
-                            Text(text = "👑", fontSize = 18.sp)
-                        }
+                        CrownIcon(modifier = Modifier.size(20.dp, 17.dp))
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(
                             text = if (isVip) "高级会员 · 尊享权益" else "开通高级会员",
-                            color = if (isVip) Color(0xFF5A3B00) else Color(0xFFFFD76E),
+                            color = Color.White,
                             fontSize = 17.sp,
                             fontWeight = FontWeight.Bold
                         )
@@ -200,7 +193,7 @@ fun MineScreen(
                         } else {
                             "解锁PDF与图片无固定品牌水印导出"
                         },
-                        color = if (isVip) Color(0xFF7A591A) else Color(0xFFA0A6B1),
+                        color = FireflyColors.Mint.copy(alpha = 0.85f),
                         fontSize = 12.sp,
                         modifier = Modifier.padding(top = 4.dp),
                         maxLines = 1,
@@ -211,22 +204,14 @@ fun MineScreen(
                 Box(
                     modifier = Modifier
                         .background(
-                            brush = if (isVip) {
-                                Brush.horizontalGradient(
-                                    listOf(Color(0xFF323642), Color(0xFF1E212A))
-                                )
-                            } else {
-                                Brush.horizontalGradient(
-                                    listOf(Color(0xFFFFEAAB), Color(0xFFFFD76E))
-                                )
-                            },
+                            color = if (isVip) Color.White else FireflyColors.VipGoldSoft,
                             shape = RoundedCornerShape(20.dp)
                         )
                         .padding(horizontal = 14.dp, vertical = 7.dp)
                 ) {
                     Text(
                         text = if (isVip) "会员中心" else "立即开通",
-                        color = if (isVip) Color(0xFFFFD76E) else Color(0xFF5A3B00),
+                        color = if (isVip) FireflyColors.Primary else FireflyColors.VipGoldText,
                         fontSize = 13.sp,
                         fontWeight = FontWeight.Bold
                     )
@@ -240,14 +225,20 @@ fun MineScreen(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(Color.White, RoundedCornerShape(16.dp))
+                .background(FireflyColors.Surface, RoundedCornerShape(16.dp))
                 .padding(horizontal = 18.dp, vertical = 8.dp)
         ) {
-            MenuItem(icon = "📄", title = "全部文档", onClick = onViewAllDocsClick)
+            MenuItem(title = "全部文档", onClick = onViewAllDocsClick) {
+                DocGlyph(color = FireflyColors.Primary, modifier = Modifier.size(21.dp))
+            }
             MenuDivider()
-            MenuItem(icon = "⚙️", title = "应用设置", onClick = onSettingsClick)
+            MenuItem(title = "应用设置", onClick = onSettingsClick) {
+                SettingsGearIcon(color = FireflyColors.Primary, modifier = Modifier.size(21.dp))
+            }
             MenuDivider()
-            MenuItem(icon = "🛡️", title = "账号与安全", onClick = onAccountSecurityClick)
+            MenuItem(title = "账号与安全", onClick = onAccountSecurityClick) {
+                ShieldGlyph(color = FireflyColors.Primary, modifier = Modifier.size(21.dp))
+            }
         }
     }
 }
@@ -293,7 +284,11 @@ private fun membershipExpiryText(expireAt: String?): String {
 }
 
 @Composable
-private fun MenuItem(icon: String, title: String, onClick: () -> Unit = {}) {
+private fun MenuItem(
+    title: String,
+    onClick: () -> Unit = {},
+    icon: @Composable () -> Unit
+) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -303,7 +298,7 @@ private fun MenuItem(icon: String, title: String, onClick: () -> Unit = {}) {
         verticalAlignment = Alignment.CenterVertically
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(text = icon, fontSize = 20.sp)
+            icon()
             Spacer(modifier = Modifier.width(14.dp))
             Text(
                 text = title,
@@ -312,7 +307,60 @@ private fun MenuItem(icon: String, title: String, onClick: () -> Unit = {}) {
                 fontWeight = FontWeight.Medium
             )
         }
-        RightChevronIcon(color = Color(0xFFC7D0DF), modifier = Modifier.size(16.dp))
+        RightChevronIcon(color = FireflyColors.Stroke, modifier = Modifier.size(16.dp))
+    }
+}
+
+/** 文档图标：圆角折角文档 + 行线 */
+@Composable
+private fun DocGlyph(color: Color, modifier: Modifier = Modifier) {
+    Canvas(modifier = modifier) {
+        val w = size.width
+        val h = size.height
+        val stroke = 1.9.dp.toPx()
+        val r = 3.dp.toPx()
+        val path = Path().apply {
+            moveTo(w * 0.22f, h * 0.14f)
+            lineTo(w * 0.62f, h * 0.14f)
+            lineTo(w * 0.78f, h * 0.32f)
+            lineTo(w * 0.78f, h * 0.86f)
+            lineTo(w * 0.22f, h * 0.86f)
+            close()
+        }
+        drawPath(path, color, style = androidx.compose.ui.graphics.drawscope.Stroke(width = stroke, join = androidx.compose.ui.graphics.StrokeJoin.Round))
+        val fold = Path().apply {
+            moveTo(w * 0.62f, h * 0.14f)
+            lineTo(w * 0.62f, h * 0.32f)
+            lineTo(w * 0.78f, h * 0.32f)
+        }
+        drawPath(fold, color, style = androidx.compose.ui.graphics.drawscope.Stroke(width = stroke, join = androidx.compose.ui.graphics.StrokeJoin.Round))
+        for (i in 0..1) {
+            val y = h * (0.48f + i * 0.16f)
+            drawLine(color, Offset(w * 0.32f, y), Offset(w * 0.62f, y), stroke, cap = androidx.compose.ui.graphics.StrokeCap.Round)
+        }
+    }
+}
+
+/** 盾牌图标：账号与安全 */
+@Composable
+private fun ShieldGlyph(color: Color, modifier: Modifier = Modifier) {
+    Canvas(modifier = modifier) {
+        val w = size.width
+        val h = size.height
+        val stroke = 1.9.dp.toPx()
+        val path = Path().apply {
+            moveTo(w * 0.5f, h * 0.10f)
+            lineTo(w * 0.84f, h * 0.24f)
+            lineTo(w * 0.84f, h * 0.54f)
+            quadraticTo(w * 0.84f, h * 0.78f, w * 0.5f, h * 0.90f)
+            quadraticTo(w * 0.16f, h * 0.78f, w * 0.16f, h * 0.54f)
+            lineTo(w * 0.16f, h * 0.24f)
+            close()
+        }
+        drawPath(path, color, style = androidx.compose.ui.graphics.drawscope.Stroke(width = stroke, join = androidx.compose.ui.graphics.StrokeJoin.Round))
+        // 对勾
+        drawLine(color, Offset(w * 0.36f, h * 0.50f), Offset(w * 0.47f, h * 0.62f), stroke, cap = androidx.compose.ui.graphics.StrokeCap.Round)
+        drawLine(color, Offset(w * 0.47f, h * 0.62f), Offset(w * 0.66f, h * 0.38f), stroke, cap = androidx.compose.ui.graphics.StrokeCap.Round)
     }
 }
 
@@ -321,9 +369,9 @@ private fun MenuDivider() {
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(start = 34.dp)
+            .padding(start = 35.dp)
             .height(1.dp)
-            .background(Color(0xFFF1F5F9))
+            .background(FireflyColors.Stroke)
     )
 }
 

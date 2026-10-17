@@ -16,6 +16,9 @@ object FireflyColors {
     /** 深湖青按压/加深态 */
     val PrimaryDark = Color(0xFF1F6667)
 
+    /** 深湖青浅阶（渐变与次级辨识用） */
+    val PrimaryLight = Color(0xFF3E9E97)
+
     /** 机甲墨青：主文案、标题、强调文字 */
     val Ink = Color(0xFF263A40)
 
@@ -57,12 +60,6 @@ object FireflyColors {
     val DarkSecondaryText = Color(0xFF9FBCB8)
     val DarkStroke = Color(0xFF2A4A4E)
     val DarkPrimary = Color(0xFF73D6C3)
-
-    /** 快捷入口辨识色（少量使用，不做整页主色） */
-    val EntryBlue = Color(0xFF3B8BF6)
-    val EntryTeal = Color(0xFF2BB5A0)
-    val EntryPurple = Color(0xFF8B7CF6)
-    val EntrySlate = Color(0xFF6B7F8C)
 
     val Error = Color(0xFFE05B5B)
 }
