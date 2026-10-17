@@ -30,6 +30,7 @@ import cn.yuandianai.juziscan.ui.theme.HpSmartColors
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import cn.yuandianai.juziscan.common.FireflyIconName
 
 @Composable
 fun ImageToPdfToolScreen(onBack: () -> Unit) {
@@ -71,7 +72,7 @@ fun ImageToPdfToolScreen(onBack: () -> Unit) {
 
         if (sourceBitmaps.isEmpty() && !isProcessing) {
             ToolEmptyState(
-                imageRes = R.drawable.tool_image_to_pdf,
+                icon = FireflyIconName.ImageToPdf,
                 title = "图片转 PDF",
                 message = "把多张图片整理成 PDF 文档，方便打印、发送和归档保存。",
                 actionText = "从相册选择",

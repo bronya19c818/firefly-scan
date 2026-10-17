@@ -1,6 +1,5 @@
 package cn.yuandianai.juziscan.scan.ui
 
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -16,13 +15,13 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import cn.yuandianai.juziscan.ui.theme.HpSmartColors
+import cn.yuandianai.juziscan.common.FireflyIcon
+import cn.yuandianai.juziscan.common.FireflyIconName
 
 @Composable
 fun ToolHeader(
@@ -50,7 +49,7 @@ fun ToolHeader(
 
 @Composable
 fun ToolEmptyState(
-    imageRes: Int,
+    icon: FireflyIconName,
     title: String,
     message: String,
     actionText: String,
@@ -72,12 +71,12 @@ fun ToolEmptyState(
             contentAlignment = Alignment.Center
         ) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Image(
-                    painter = painterResource(imageRes),
-                    contentDescription = title,
-                    contentScale = ContentScale.Fit,
-                    modifier = Modifier.size(160.dp)
-                )
+                Box(
+                    modifier = Modifier.size(96.dp).background(androidx.compose.material3.MaterialTheme.colorScheme.primaryContainer, RoundedCornerShape(24.dp)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    FireflyIcon(icon, size = 48.dp, tint = androidx.compose.material3.MaterialTheme.colorScheme.primary, contentDescription = null)
+                }
                 Text(
                     text = title,
                     color = HpSmartColors.TextPrimary,
@@ -106,7 +105,7 @@ fun ToolEmptyState(
 
 @Composable
 fun ToolIntroCard(
-    imageRes: Int,
+    icon: FireflyIconName,
     title: String,
     message: String,
     modifier: Modifier = Modifier
@@ -118,12 +117,12 @@ fun ToolIntroCard(
             .padding(horizontal = 20.dp, vertical = 18.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Image(
-            painter = painterResource(imageRes),
-            contentDescription = title,
-            contentScale = ContentScale.Fit,
-            modifier = Modifier.size(132.dp)
-        )
+        Box(
+                    modifier = Modifier.size(96.dp).background(androidx.compose.material3.MaterialTheme.colorScheme.primaryContainer, RoundedCornerShape(24.dp)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    FireflyIcon(icon, size = 48.dp, tint = androidx.compose.material3.MaterialTheme.colorScheme.primary, contentDescription = null)
+                }
         Text(
             text = title,
             color = HpSmartColors.TextPrimary,

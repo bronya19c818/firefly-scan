@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -34,6 +35,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import cn.yuandianai.juziscan.auth.maskPhone
 import cn.yuandianai.juziscan.ui.theme.HpSmartColors
+import cn.yuandianai.juziscan.common.FireflyIcon
+import cn.yuandianai.juziscan.common.FireflyIconName
 
 @Composable
 fun AccountSecurityScreen(
@@ -61,12 +64,9 @@ fun AccountSecurityScreen(
             modifier = Modifier.fillMaxWidth().height(64.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(
-                text = "‹",
-                fontSize = 38.sp,
-                color = HpSmartColors.TextPrimary,
-                modifier = Modifier.clickable(onClick = onBack).padding(end = 18.dp)
-            )
+            Box(Modifier.size(48.dp).clickable(onClick = onBack), contentAlignment = Alignment.Center) {
+                FireflyIcon(FireflyIconName.Back, tint = HpSmartColors.TextPrimary)
+            }
             Text(
                 text = "账号与安全",
                 fontSize = 22.sp,
@@ -171,7 +171,7 @@ private fun AccountRow(
         )
         Row(verticalAlignment = Alignment.CenterVertically) {
             if (value.isNotEmpty()) Text(value, color = HpSmartColors.TextSecondary, fontSize = 14.sp)
-            if (showChevron) Text("  ›", color = Color(0xFFC7D0DF), fontSize = 23.sp)
+            if (showChevron) FireflyIcon(FireflyIconName.ChevronRight, modifier = Modifier.padding(start = 8.dp), size = 20.dp, tint = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant, contentDescription = null)
         }
     }
 }

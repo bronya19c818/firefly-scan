@@ -101,9 +101,8 @@ fun TopSoftButton(
     Box(
         modifier = modifier
             .size(46.dp)
-            .semantics { contentDescription = "返回" }
             .background(HpSmartColors.SurfaceSoft, CircleShape)
-            .pointerInput(Unit) { detectTapGesturesCompat(onClick) },
+            .clickable(onClick = onClick),
         contentAlignment = Alignment.Center
     ) {
         BackArrowIcon(
@@ -202,7 +201,7 @@ fun SmallActionDock(
 ) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier.pointerInput(label) { detectTapGesturesCompat(onClick) }
+        modifier = Modifier.clickable(onClick = onClick)
     ) {
         Box(
             modifier = Modifier
@@ -282,7 +281,7 @@ fun BottomModeButton(
 ) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier.pointerInput(label) { detectTapGesturesCompat(onClick) }
+        modifier = Modifier.clickable(onClick = onClick)
     ) {
         Box(
             modifier = Modifier
@@ -321,19 +320,13 @@ fun FloatingMoreButton(
             .padding(10.dp)
             .size(36.dp)
             .background(HpSmartColors.Accent, CircleShape)
-            .pointerInput(Unit) { detectTapGesturesCompat(onClick) },
+            .clickable(onClick = onClick),
         contentAlignment = Alignment.Center
     ) {
         if (isOpen) {
-            CloseCrossIcon(color = Color.White, modifier = Modifier.size(16.dp))
+            CloseCrossIcon(color = HpSmartColors.CameraText, modifier = Modifier.size(24.dp))
         } else {
-            Text(
-                text = "···",
-                color = Color.White,
-                fontSize = 16.sp,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.padding(bottom = 3.dp)
-            )
+            FireflyIcon(FireflyIconName.More, tint = HpSmartColors.CameraText, size = 24.dp)
         }
     }
 }
@@ -348,7 +341,7 @@ fun PreviewBottomAction(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier
             .width(70.dp)
-            .pointerInput(label) { detectTapGesturesCompat(onClick) }
+            .clickable(onClick = onClick)
     ) {
         Box(
             modifier = Modifier
@@ -378,14 +371,11 @@ fun BackPillButton(
     Row(
         modifier = modifier
             .background(HpSmartColors.SurfaceSoft, RoundedCornerShape(22.dp))
-            .pointerInput(Unit) { detectTapGesturesCompat(onClick) }
+            .clickable(onClick = onClick)
             .padding(horizontal = 16.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        BackArrowIcon(
-            color = HpSmartColors.TextPrimary,
-            modifier = Modifier.size(16.dp)
-        )
+        FireflyIcon(FireflyIconName.Back, tint = HpSmartColors.TextPrimary, size = 16.dp, contentDescription = null)
         Spacer(modifier = Modifier.width(6.dp))
         Text(
             text = "导出分享",
@@ -408,7 +398,7 @@ fun CorrectionModeChip(
         fontSize = 15.sp,
         fontWeight = if (active) FontWeight.Bold else FontWeight.Normal,
         modifier = Modifier
-            .pointerInput(label) { detectTapGesturesCompat(onClick) }
+            .clickable(onClick = onClick)
             .padding(horizontal = 8.dp, vertical = 6.dp)
     )
 }

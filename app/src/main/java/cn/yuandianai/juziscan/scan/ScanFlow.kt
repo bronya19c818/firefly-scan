@@ -117,6 +117,8 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import cn.yuandianai.juziscan.common.FireflyIcon
+import cn.yuandianai.juziscan.common.FireflyIconName
 
 @Composable
 fun ScanFlow() {
@@ -293,23 +295,10 @@ private fun PermissionBenefit(text: String) {
         Box(
             modifier = Modifier
                 .size(22.dp)
-                .background(Color(0xFFE7EFFF), CircleShape),
+                .background(androidx.compose.material3.MaterialTheme.colorScheme.primaryContainer, CircleShape),
             contentAlignment = Alignment.Center
         ) {
-            Canvas(modifier = Modifier.size(12.dp)) {
-                drawLine(
-                    color = Color(0xFF0B63FF),
-                    start = Offset(size.width * 0.18f, size.height * 0.55f),
-                    end = Offset(size.width * 0.42f, size.height * 0.78f),
-                    strokeWidth = 2.2.dp.toPx()
-                )
-                drawLine(
-                    color = Color(0xFF0B63FF),
-                    start = Offset(size.width * 0.42f, size.height * 0.78f),
-                    end = Offset(size.width * 0.86f, size.height * 0.22f),
-                    strokeWidth = 2.2.dp.toPx()
-                )
-            }
+            FireflyIcon(FireflyIconName.Check, size = 16.dp, tint = androidx.compose.material3.MaterialTheme.colorScheme.primary, contentDescription = null)
         }
         Text(
             text = text,
@@ -321,33 +310,8 @@ private fun PermissionBenefit(text: String) {
 }
 
 @Composable
-private fun CameraPermissionGlyph(
-    color: Color,
-    modifier: Modifier = Modifier
-) {
-    Canvas(modifier = modifier) {
-        val stroke = 4.dp.toPx()
-        drawRoundRect(
-            color = color,
-            topLeft = Offset(size.width * 0.10f, size.height * 0.28f),
-            size = Size(size.width * 0.80f, size.height * 0.58f),
-            cornerRadius = androidx.compose.ui.geometry.CornerRadius(12.dp.toPx(), 12.dp.toPx()),
-            style = Stroke(width = stroke)
-        )
-        drawRoundRect(
-            color = color,
-            topLeft = Offset(size.width * 0.31f, size.height * 0.16f),
-            size = Size(size.width * 0.30f, size.height * 0.18f),
-            cornerRadius = androidx.compose.ui.geometry.CornerRadius(6.dp.toPx(), 6.dp.toPx()),
-            style = Stroke(width = stroke)
-        )
-        drawCircle(
-            color = color,
-            radius = size.minDimension * 0.18f,
-            center = Offset(size.width * 0.50f, size.height * 0.58f),
-            style = Stroke(width = stroke)
-        )
-    }
+private fun CameraPermissionGlyph(color: Color, modifier: Modifier = Modifier) {
+    FireflyIcon(FireflyIconName.Camera, tint = color, modifier = modifier, contentDescription = null)
 }
 
 @Composable
@@ -2595,7 +2559,7 @@ private fun ExitConfirmationDialog(
                         .background(Color(0xFFFFECEB), CircleShape),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text(text = "⚠️", fontSize = 28.sp)
+                    FireflyIcon(FireflyIconName.Warning, size = 28.dp, tint = androidx.compose.material3.MaterialTheme.colorScheme.error, contentDescription = null)
                 }
 
                 Text(

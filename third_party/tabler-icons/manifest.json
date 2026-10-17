@@ -1,0 +1,254 @@
+{
+  "version": "v3.49.0",
+  "commit": "bbed884d15354b5cebf2493371f20dc2d5e83eaf",
+  "repository": "https://github.com/tabler/tabler-icons",
+  "icons": [
+    {
+      "name": "Back",
+      "tabler": "arrow-left",
+      "meaning": "返回",
+      "sha256": "12af90f1bb49b7ae62792ecf38d2fa8b39daa4753e39ebc3520d07482a90704f"
+    },
+    {
+      "name": "Close",
+      "tabler": "x",
+      "meaning": "关闭",
+      "sha256": "9350785360414c39450c3505f17d1745e55a7534edace8548e30cf49e3727d43"
+    },
+    {
+      "name": "FlashOn",
+      "tabler": "bolt",
+      "meaning": "闪光灯：开启",
+      "sha256": "5321162cf117d3a83aec6c8f67a3bb0398068edb487b524d280b8fb47d6b98ce"
+    },
+    {
+      "name": "FlashOff",
+      "tabler": "bolt-off",
+      "meaning": "闪光灯：关闭",
+      "sha256": "46395342188eb5d2a1e269083ce728804cc559fb2414a04ccd3d409da08f70eb"
+    },
+    {
+      "name": "FlashAuto",
+      "tabler": "camera-bolt",
+      "meaning": "闪光灯：自动",
+      "sha256": "f6d6fada52d59bf29b0c12067d312413e34aa2bd3a9019dbdef64102afd7a846"
+    },
+    {
+      "name": "Settings",
+      "tabler": "settings",
+      "meaning": "设置",
+      "sha256": "ef9cf42d822c00b4fad5bc5eeceddd4e1ec3774bb7ddd09891d0fba274bc3e95"
+    },
+    {
+      "name": "Gallery",
+      "tabler": "photo",
+      "meaning": "相册导入",
+      "sha256": "67d9b3ec02867e98ad17739380919a2d82287d15d3463161f450e17047ed319b"
+    },
+    {
+      "name": "Add",
+      "tabler": "plus",
+      "meaning": "添加",
+      "sha256": "9cc497d4cc1eb38cf9daae18f41ffdc1a5e2a8431d70247b0854978f303f28d6"
+    },
+    {
+      "name": "Rotate",
+      "tabler": "rotate-clockwise",
+      "meaning": "旋转",
+      "sha256": "df4126db6c4a8ef7fc713b2497e21d3b8c70bac9a9fb45db1f58e5dd486f467d"
+    },
+    {
+      "name": "Crop",
+      "tabler": "crop",
+      "meaning": "裁剪",
+      "sha256": "fc184b9acc82e67ab38db926f01a921400ce17fefc5e2a75c887a8959e9f248e"
+    },
+    {
+      "name": "Expand",
+      "tabler": "arrows-maximize",
+      "meaning": "展开",
+      "sha256": "106923855401d2164938e7db50f20c6a47c90d8f4aa4e299b94792ea87dd75e5"
+    },
+    {
+      "name": "Share",
+      "tabler": "share",
+      "meaning": "分享",
+      "sha256": "31df66b0cdca73ae6bfe8b3afc30488e53db354d4de418190512d9023b23675e"
+    },
+    {
+      "name": "Refresh",
+      "tabler": "refresh",
+      "meaning": "重拍",
+      "sha256": "9dd8ab8cac268489501cbb0a106d93cc3f367add493d20c47ec1e1d9804c760a"
+    },
+    {
+      "name": "CheckCircle",
+      "tabler": "circle-check",
+      "meaning": "已选中",
+      "sha256": "c4cb2e026be5f4c217c3ff9b0ccefb9a26b7a135bc82eef28a8bead0cc02a958"
+    },
+    {
+      "name": "ChevronRight",
+      "tabler": "chevron-right",
+      "meaning": "进入",
+      "sha256": "83733bb6e03e1d20fd2674d06a493642c8ea6eef76c44ebb2239b9ef17dedff7"
+    },
+    {
+      "name": "Print",
+      "tabler": "printer",
+      "meaning": "打印",
+      "sha256": "6f530e94836068b346f241313a6040c1d55ff1b677d326dc6c1b3c5b42c5c1eb"
+    },
+    {
+      "name": "Reorder",
+      "tabler": "arrows-sort",
+      "meaning": "重新排序",
+      "sha256": "69a75e98c6128a69297e3e1cd066b9d7ed8c621b9de4c14b2e3156b7646d7b0f"
+    },
+    {
+      "name": "Edit",
+      "tabler": "pencil",
+      "meaning": "编辑",
+      "sha256": "422796681dab2177b958836952b0a581025013a78d8a8c9df9c1af43f62d0e97"
+    },
+    {
+      "name": "Replace",
+      "tabler": "replace",
+      "meaning": "更换",
+      "sha256": "1ab8154d480b743fb0e983af61add3ab209b94dfb20331542783c64f93f7f57d"
+    },
+    {
+      "name": "Delete",
+      "tabler": "trash",
+      "meaning": "删除",
+      "sha256": "4b90fa07a6d980736951d9e83b91432972b2bcecf81be4578608a0983f2ebc9d"
+    },
+    {
+      "name": "Crown",
+      "tabler": "crown",
+      "meaning": "会员",
+      "sha256": "cd10a7c312375a9d9e6b5439b972d652e3472416fa9097172a4769f8322513b0"
+    },
+    {
+      "name": "Camera",
+      "tabler": "camera",
+      "meaning": "相机",
+      "sha256": "a87eae819b9c5a98b07e635c5a52fd2aaed392000ce62bb8724cd5f5baba4bc7"
+    },
+    {
+      "name": "Scan",
+      "tabler": "scan",
+      "meaning": "扫描",
+      "sha256": "4e64112a98f6efa9ddfcb6486aa12d25867cf9d7eb13e51c8608d8bc12740586"
+    },
+    {
+      "name": "IdCard",
+      "tabler": "id",
+      "meaning": "证件扫描",
+      "sha256": "e76a88444e79afcdcfdf527dcf2a25e38f7dfb209191b6c05c2a1ff01585a46b"
+    },
+    {
+      "name": "TextScan",
+      "tabler": "text-scan-2",
+      "meaning": "文字识别",
+      "sha256": "9808d3ccf90cd99b67d84a4ebc3a915c2683a4ccf65496d60a8b812602dbd23d"
+    },
+    {
+      "name": "Tools",
+      "tabler": "layout-grid",
+      "meaning": "更多工具",
+      "sha256": "91f923bcca6e9201ccedd2a10bb5d5a7eb3dbb5fa5a26af394d362f35c935237"
+    },
+    {
+      "name": "Home",
+      "tabler": "home",
+      "meaning": "首页",
+      "sha256": "069600f461f3e967685765723a851af7b35f24b715e03d41a2928152cf75644c"
+    },
+    {
+      "name": "User",
+      "tabler": "user",
+      "meaning": "我的",
+      "sha256": "63554429f551522ea578a9bf72d1d350bd0ffdb8ede3af92a05e92d71cab6b9c"
+    },
+    {
+      "name": "Document",
+      "tabler": "file-text",
+      "meaning": "文档",
+      "sha256": "afc807ae397fc2419ac5cbca6a1e085a5f761277397682cbad3d907ca78693f5"
+    },
+    {
+      "name": "Shield",
+      "tabler": "shield-check",
+      "meaning": "账号与安全",
+      "sha256": "7d12a28bb5b8ba69445a94118aa96b57a513f8d45e23974665f25c597eaccc30"
+    },
+    {
+      "name": "Watermark",
+      "tabler": "rubber-stamp",
+      "meaning": "添加水印",
+      "sha256": "f4930af612507ab3b7f05478425bb4a1c77544e3b9cf44ece7567dae0f1f303f"
+    },
+    {
+      "name": "Stitch",
+      "tabler": "layout-rows",
+      "meaning": "长图拼接",
+      "sha256": "6443a82f21fff4e73b3792a72c486478ab9a1d366cb46b738e0d4bbb0ac6a932"
+    },
+    {
+      "name": "ImageToPdf",
+      "tabler": "file-type-pdf",
+      "meaning": "图片转PDF",
+      "sha256": "36ef668b02762697eb2d3e360ec13580651908ded26c08facfe3b99fc96ccebf"
+    },
+    {
+      "name": "Compress",
+      "tabler": "arrows-minimize",
+      "meaning": "图片压缩",
+      "sha256": "7a566eea9231dfb1eff4cf17e9f5aedf1a453f7b3fced3c849f1ba131595f678"
+    },
+    {
+      "name": "QrCode",
+      "tabler": "qrcode",
+      "meaning": "二维码工具",
+      "sha256": "386c3e0e05c0fc80ecc36b754a644e2ed495c3722f0aeba0f086a15e291d8a4c"
+    },
+    {
+      "name": "Wifi",
+      "tabler": "wifi",
+      "meaning": "WiFi传图",
+      "sha256": "3ae338dbaaf32c73894354408b563b3572184aec574cd31626db7aa34eb7a9b6"
+    },
+    {
+      "name": "More",
+      "tabler": "dots",
+      "meaning": "更多操作",
+      "sha256": "798ff2bd35fdb045535872ed5d5e93e39a289c6fd0faaf01639ae84180e54dae"
+    },
+    {
+      "name": "Check",
+      "tabler": "check",
+      "meaning": "已开启",
+      "sha256": "e206067a7d570997b5b3a7d30ab287c0b15a492787649a8b96dff8fad2862fbe"
+    },
+    {
+      "name": "Warning",
+      "tabler": "alert-triangle",
+      "meaning": "提示",
+      "sha256": "25b1f0c39f34647017df84a0cdc9e691c697737094a5956c360ab448a7fd5bef"
+    },
+    {
+      "name": "Wallet",
+      "tabler": "wallet",
+      "meaning": "支付",
+      "sha256": "1cfac2833c5f65a9e3d3309ccc21c6c1cebec4fabf49a30ab75987cf09fb9a38"
+    },
+    {
+      "name": "Table",
+      "tabler": "table",
+      "meaning": "表格识别",
+      "sha256": "4e5361445165142336fe34566d43906a323765906bfc3bb26571121807ace3f7"
+    }
+  ],
+  "license_sha256": "b740a1d46122672da62833e97f7e7c8a13fa85cbc7445b584b297cc00dde93db"
+}

@@ -1,7 +1,7 @@
 package cn.yuandianai.juziscan.scan.ui
 
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -14,9 +14,7 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
@@ -26,14 +24,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import cn.yuandianai.juziscan.scan.ScanEntry
 import cn.yuandianai.juziscan.ui.theme.HpSmartColors
+import cn.yuandianai.juziscan.common.FireflyIcon
 
 @Composable
 fun AllToolsScreen(
@@ -44,7 +41,7 @@ fun AllToolsScreen(
     Column(
         modifier = modifier
             .fillMaxSize()
-            .background(Color(0xFFF5F8FF))
+            .background(cn.yuandianai.juziscan.ui.theme.FireflyColors.Background)
             .statusBarsPadding()
             .navigationBarsPadding()
             .verticalScroll(rememberScrollState())
@@ -115,34 +112,35 @@ private fun ToolSectionCard(
         modifier = modifier
             .fillMaxWidth()
             .background(color = Color.White, shape = RoundedCornerShape(16.dp))
-            .padding(horizontal = 18.dp, vertical = 18.dp)
+            .padding(horizontal = 14.dp, vertical = 14.dp)
     ) {
         Text(
             text = title,
             color = HpSmartColors.TextPrimary,
-            fontSize = 18.sp,
+            fontSize = 16.sp,
             fontWeight = FontWeight.Bold
         )
 
-        Spacer(modifier = Modifier.height(18.dp))
+        Spacer(modifier = Modifier.height(14.dp))
 
-        tools.chunked(3).forEachIndexed { index, rowTools ->
+        tools.chunked(4).forEachIndexed { index, rowTools ->
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 rowTools.forEach { tool ->
                     AllToolsItem(
                         tool = tool,
-                        onClick = { onToolClick(tool.entry) }
+                        onClick = { onToolClick(tool.entry) },
+                        modifier = Modifier.weight(1f)
                     )
                 }
-                repeat(3 - rowTools.size) {
-                    Spacer(modifier = Modifier.width(94.dp))
+                repeat(4 - rowTools.size) {
+                    Spacer(modifier = Modifier.weight(1f))
                 }
             }
-            if (index != tools.chunked(3).lastIndex) {
-                Spacer(modifier = Modifier.height(18.dp))
+            if (index != tools.chunked(4).lastIndex) {
+                Spacer(modifier = Modifier.height(16.dp))
             }
         }
     }
@@ -151,46 +149,32 @@ private fun ToolSectionCard(
 @Composable
 private fun AllToolsItem(
     tool: ToolCatalogItem,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
     Column(
-        modifier = Modifier
-            .width(94.dp)
-            .pointerInput(tool.label) { detectTapGesturesCompat(onClick) },
+        modifier = modifier.clickable(onClick = onClick),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Box(
             modifier = Modifier
-                .size(64.dp)
-                .clip(CircleShape)
+                .size(52.dp)
+                .clip(RoundedCornerShape(14.dp))
                 .background(tool.color.copy(alpha = 0.12f)),
             contentAlignment = Alignment.Center
         ) {
-            val imageRes = tool.imageRes
-            if (imageRes != null) {
-                Image(
-                    painter = painterResource(imageRes),
-                    contentDescription = tool.label,
-                    contentScale = ContentScale.Fit,
-                    modifier = Modifier.size(46.dp)
-                )
-            } else {
-                Text(
-                    text = tool.emoji ?: tool.label.take(1),
-                    color = tool.color,
-                    fontSize = 22.sp,
-                    fontWeight = FontWeight.Bold
-                )
-            }
+            FireflyIcon(tool.icon, size = 24.dp, tint = tool.color, contentDescription = null)
         }
 
         Text(
             text = tool.label,
             color = HpSmartColors.TextPrimary,
-            fontSize = 14.sp,
+            fontSize = 12.sp,
+            lineHeight = 16.sp,
+            maxLines = 2,
             fontWeight = FontWeight.Medium,
             textAlign = TextAlign.Center,
-            modifier = Modifier.padding(top = 10.dp)
+            modifier = Modifier.padding(top = 8.dp)
         )
     }
 }

@@ -1,6 +1,6 @@
 package cn.yuandianai.juziscan.scan.ui
 
-import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -30,12 +30,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
@@ -51,6 +47,8 @@ import cn.yuandianai.juziscan.scan.LegalDocType
 import cn.yuandianai.juziscan.scan.ScanEntry
 import cn.yuandianai.juziscan.ui.theme.FireflyColors
 import cn.yuandianai.juziscan.ui.theme.FireflyTypography
+import cn.yuandianai.juziscan.common.FireflyIcon
+import cn.yuandianai.juziscan.common.FireflyIconName
 
 /**
  * 萤火Scan A1 首页（design.md 4.1 / design_image/萤火Scan 首页界面.png）。
@@ -223,32 +221,13 @@ private fun VipEntryPill(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(4.dp)
     ) {
-        CrownGlyph(color = FireflyColors.VipGold, modifier = Modifier.size(13.dp))
+        FireflyIcon(FireflyIconName.Crown, tint = FireflyColors.VipGold, modifier = Modifier.size(16.dp), contentDescription = null)
         Text(
             text = if (isVip) "会员权益" else "开通会员",
             color = FireflyColors.VipGoldText,
             fontSize = 12.sp,
             fontWeight = FontWeight.SemiBold
         )
-    }
-}
-
-@Composable
-private fun CrownGlyph(color: Color, modifier: Modifier = Modifier) {
-    Canvas(modifier = modifier) {
-        val w = size.width
-        val h = size.height
-        val path = Path().apply {
-            moveTo(w * 0.12f, h * 0.78f)
-            lineTo(w * 0.10f, h * 0.30f)
-            lineTo(w * 0.32f, h * 0.52f)
-            lineTo(w * 0.50f, h * 0.18f)
-            lineTo(w * 0.68f, h * 0.52f)
-            lineTo(w * 0.90f, h * 0.30f)
-            lineTo(w * 0.88f, h * 0.78f)
-            close()
-        }
-        drawPath(path, color)
     }
 }
 
@@ -317,7 +296,7 @@ private fun MainScanCard(
             .clip(shape)
             .background(FireflyColors.Surface, shape)
             .border(1.5.dp, Color(0xFF91DCCB).copy(alpha = 0.65f), shape)
-            .pointerInput(Unit) { detectTapGesturesCompat(onClick) }
+            .clickable(onClick = onClick)
     ) {
         // 底层：定稿微光背景插画（不透明内区，全幅铺满，边缘与卡片圆角完全重合）
         Image(
@@ -334,7 +313,7 @@ private fun MainScanCard(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
-            ScanCameraGlyph(color = Color.White, modifier = Modifier.size(46.dp))
+            FireflyIcon(FireflyIconName.Scan, tint = Color.White, modifier = Modifier.size(40.dp), contentDescription = null)
             Text(
                 text = "文件扫描",
                 color = Color.White,
@@ -352,54 +331,6 @@ private fun MainScanCard(
     }
 }
 
-/** 相机图标 + 四角取景框 */
-@Composable
-private fun ScanCameraGlyph(color: Color, modifier: Modifier = Modifier) {
-    Canvas(modifier = modifier) {
-        val w = size.width
-        val h = size.height
-        val stroke = 2.6.dp.toPx()
-        val bracketStroke = 2.8.dp.toPx()
-        // 四角取景框
-        val len = w * 0.16f
-        val m = w * 0.02f
-        // 左上
-        drawLine(color, Offset(m, m + len), Offset(m, m), bracketStroke, cap = StrokeCap.Round)
-        drawLine(color, Offset(m, m), Offset(m + len, m), bracketStroke, cap = StrokeCap.Round)
-        // 右上
-        drawLine(color, Offset(w - m - len, m), Offset(w - m, m), bracketStroke, cap = StrokeCap.Round)
-        drawLine(color, Offset(w - m, m), Offset(w - m, m + len), bracketStroke, cap = StrokeCap.Round)
-        // 左下
-        drawLine(color, Offset(m, h - m - len), Offset(m, h - m), bracketStroke, cap = StrokeCap.Round)
-        drawLine(color, Offset(m, h - m), Offset(m + len, h - m), bracketStroke, cap = StrokeCap.Round)
-        // 右下
-        drawLine(color, Offset(w - m - len, h - m), Offset(w - m, h - m), bracketStroke, cap = StrokeCap.Round)
-        drawLine(color, Offset(w - m, h - m), Offset(w - m, h - m - len), bracketStroke, cap = StrokeCap.Round)
-        // 相机机身
-        drawRoundRect(
-            color = color,
-            topLeft = Offset(w * 0.28f, h * 0.36f),
-            size = androidx.compose.ui.geometry.Size(w * 0.44f, h * 0.32f),
-            cornerRadius = androidx.compose.ui.geometry.CornerRadius(5.dp.toPx(), 5.dp.toPx()),
-            style = Stroke(width = stroke)
-        )
-        drawRoundRect(
-            color = color,
-            topLeft = Offset(w * 0.40f, h * 0.28f),
-            size = androidx.compose.ui.geometry.Size(w * 0.20f, h * 0.10f),
-            cornerRadius = androidx.compose.ui.geometry.CornerRadius(3.dp.toPx(), 3.dp.toPx()),
-            style = Stroke(width = stroke)
-        )
-        // 镜头
-        drawCircle(
-            color = color,
-            radius = w * 0.09f,
-            center = Offset(w * 0.50f, h * 0.52f),
-            style = Stroke(width = stroke)
-        )
-    }
-}
-
 /* ---------------- 四快捷入口 ---------------- */
 
 private data class QuickEntrySpec(
@@ -407,7 +338,7 @@ private data class QuickEntrySpec(
     val chipColor: Color,
     val glyphColor: Color,
     val onClick: () -> Unit,
-    val glyph: @Composable (Color, Modifier) -> Unit
+    val icon: FireflyIconName
 )
 
 @Composable
@@ -419,19 +350,11 @@ private fun QuickEntryRow(
 ) {
     // 色彩全部取自 design.md 3.1 品牌色板：深湖青系 + 薄荷青 + 次要墨青
     val entries = listOf(
-        QuickEntrySpec("证件扫描", FireflyColors.Primary, Color.White, { onEntryClick(ScanEntry.IdCard) }) { c, m ->
-            IdCardGlyph(c, m)
-        },
-        QuickEntrySpec("文字识别", FireflyColors.PrimaryLight, Color.White, { onEntryClick(ScanEntry.Ocr) }) { c, m ->
-            TextScanGlyph(c, m)
-        },
-        // 薄荷青底配白色线条
-        QuickEntrySpec("相册导入", FireflyColors.Mint, Color.White, onImportClick) { c, m ->
-            GalleryGlyph(c, m)
-        },
-        QuickEntrySpec("更多工具", FireflyColors.SecondaryText, Color.White, onMoreToolsClick) { c, m ->
-            GridGlyph(c, m)
-        }
+        QuickEntrySpec("证件扫描", FireflyColors.Primary, Color.White, { onEntryClick(ScanEntry.IdCard) }, FireflyIconName.IdCard),
+        QuickEntrySpec("文字识别", FireflyColors.PrimaryLight, Color.White, { onEntryClick(ScanEntry.Ocr) }, FireflyIconName.TextScan),
+        // 薄荷青底配深湖青线条，保持小尺寸对比度。
+        QuickEntrySpec("相册导入", FireflyColors.Mint, FireflyColors.PrimaryDark, onImportClick, FireflyIconName.Gallery),
+        QuickEntrySpec("更多工具", FireflyColors.SecondaryText, Color.White, onMoreToolsClick, FireflyIconName.Tools)
     )
 
     Row(
@@ -444,7 +367,7 @@ private fun QuickEntryRow(
             Column(
                 modifier = Modifier
                     .weight(1f)
-                    .pointerInput(entry.label) { detectTapGesturesCompat(entry.onClick) },
+                    .clickable(onClick = entry.onClick),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Box(
@@ -460,7 +383,7 @@ private fun QuickEntryRow(
                             .background(entry.chipColor, RoundedCornerShape(12.dp)),
                         contentAlignment = Alignment.Center
                     ) {
-                        entry.glyph(entry.glyphColor, Modifier.size(22.dp))
+                        FireflyIcon(entry.icon, tint = entry.glyphColor, size = 26.dp, contentDescription = null)
                     }
                 }
                 Text(
@@ -470,107 +393,6 @@ private fun QuickEntryRow(
                     fontWeight = FontWeight.Medium,
                     maxLines = 1,
                     modifier = Modifier.padding(top = 8.dp)
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun IdCardGlyph(color: Color, modifier: Modifier = Modifier) {
-    Canvas(modifier = modifier) {
-        val w = size.width
-        val h = size.height
-        val stroke = 2.0.dp.toPx()
-        drawRoundRect(
-            color = color,
-            topLeft = Offset(w * 0.12f, h * 0.20f),
-            size = androidx.compose.ui.geometry.Size(w * 0.76f, h * 0.60f),
-            cornerRadius = androidx.compose.ui.geometry.CornerRadius(4.dp.toPx(), 4.dp.toPx()),
-            style = Stroke(width = stroke)
-        )
-        drawCircle(
-            color = color,
-            radius = w * 0.09f,
-            center = Offset(w * 0.32f, h * 0.44f)
-        )
-        drawLine(color, Offset(w * 0.20f, h * 0.66f), Offset(w * 0.44f, h * 0.66f), stroke, cap = StrokeCap.Round)
-        drawLine(color, Offset(w * 0.56f, h * 0.38f), Offset(w * 0.78f, h * 0.38f), stroke, cap = StrokeCap.Round)
-        drawLine(color, Offset(w * 0.56f, h * 0.52f), Offset(w * 0.78f, h * 0.52f), stroke, cap = StrokeCap.Round)
-        drawLine(color, Offset(w * 0.56f, h * 0.66f), Offset(w * 0.70f, h * 0.66f), stroke, cap = StrokeCap.Round)
-    }
-}
-
-@Composable
-private fun TextScanGlyph(color: Color, modifier: Modifier = Modifier) {
-    Canvas(modifier = modifier) {
-        val w = size.width
-        val h = size.height
-        val stroke = 2.4.dp.toPx()
-        // “T” 字形
-        drawLine(color, Offset(w * 0.28f, h * 0.24f), Offset(w * 0.72f, h * 0.24f), stroke, cap = StrokeCap.Round)
-        drawLine(color, Offset(w * 0.50f, h * 0.24f), Offset(w * 0.50f, h * 0.72f), stroke, cap = StrokeCap.Round)
-        drawLine(color, Offset(w * 0.38f, h * 0.72f), Offset(w * 0.62f, h * 0.72f), stroke, cap = StrokeCap.Round)
-    }
-}
-
-/**
- * 相册导入图标：与 IdCardGlyph / TextScanGlyph 同一套线宽与圆角语言，
- * 避免与其他入口图案产生“拼接感”。
- */
-@Composable
-private fun GalleryGlyph(color: Color, modifier: Modifier = Modifier) {
-    Canvas(modifier = modifier) {
-        val w = size.width
-        val h = size.height
-        val stroke = 2.1.dp.toPx()
-        // 外框
-        drawRoundRect(
-            color = color,
-            topLeft = Offset(w * 0.14f, h * 0.20f),
-            size = androidx.compose.ui.geometry.Size(w * 0.72f, h * 0.60f),
-            cornerRadius = androidx.compose.ui.geometry.CornerRadius(4.5.dp.toPx(), 4.5.dp.toPx()),
-            style = Stroke(width = stroke)
-        )
-        // 太阳
-        drawCircle(
-            color = color,
-            radius = w * 0.075f,
-            center = Offset(w * 0.34f, h * 0.38f)
-        )
-        // 山形（与山脊同一描边语言，圆角衔接）
-        val mountain = Path().apply {
-            moveTo(w * 0.20f, h * 0.74f)
-            lineTo(w * 0.42f, h * 0.48f)
-            lineTo(w * 0.56f, h * 0.62f)
-        }
-        drawPath(mountain, color, style = Stroke(width = stroke, cap = StrokeCap.Round, join = androidx.compose.ui.graphics.StrokeJoin.Round))
-        val hill = Path().apply {
-            moveTo(w * 0.48f, h * 0.74f)
-            lineTo(w * 0.63f, h * 0.56f)
-            lineTo(w * 0.80f, h * 0.74f)
-        }
-        drawPath(hill, color, style = Stroke(width = stroke, cap = StrokeCap.Round, join = androidx.compose.ui.graphics.StrokeJoin.Round))
-    }
-}
-
-@Composable
-private fun GridGlyph(color: Color, modifier: Modifier = Modifier) {
-    Canvas(modifier = modifier) {
-        val w = size.width
-        val h = size.height
-        val cell = w * 0.28f
-        val gap = w * 0.10f
-        val startX = (w - cell * 2 - gap) / 2f
-        val startY = (h - cell * 2 - gap) / 2f
-        val r = androidx.compose.ui.geometry.CornerRadius(3.dp.toPx(), 3.dp.toPx())
-        for (row in 0..1) {
-            for (col in 0..1) {
-                drawRoundRect(
-                    color = color,
-                    topLeft = Offset(startX + col * (cell + gap), startY + row * (cell + gap)),
-                    size = androidx.compose.ui.geometry.Size(cell, cell),
-                    cornerRadius = r
                 )
             }
         }
@@ -644,11 +466,11 @@ fun FireflyBottomNav(
             verticalAlignment = Alignment.CenterVertically
         ) {
             BottomNavItem("首页", currentTab == HomeTab.Home, onHomeClick) { active ->
-                HomeGlyph(color = navColor(active), modifier = Modifier.size(24.dp))
+                FireflyIcon(FireflyIconName.Home, selected = active, tint = navColor(active), contentDescription = null)
             }
             Spacer(modifier = Modifier.width(72.dp))
             BottomNavItem("我的", currentTab == HomeTab.Mine, onMineClick) { active ->
-                ProfileGlyph(color = navColor(active), modifier = Modifier.size(24.dp))
+                FireflyIcon(FireflyIconName.User, selected = active, tint = navColor(active), contentDescription = null)
             }
         }
 
@@ -664,10 +486,10 @@ fun FireflyBottomNav(
                     CircleShape
                 )
                 .border(3.dp, FireflyColors.Surface, CircleShape)
-                .pointerInput(Unit) { detectTapGesturesCompat(onCameraClick) },
+                .clickable(onClick = onCameraClick),
             contentAlignment = Alignment.Center
         ) {
-            ScanLineGlyph(color = Color.White, modifier = Modifier.size(28.dp))
+            FireflyIcon(FireflyIconName.Scan, tint = Color.White, modifier = Modifier.size(28.dp))
         }
     }
 }
@@ -685,7 +507,7 @@ private fun BottomNavItem(
     Column(
         modifier = Modifier
             .width(56.dp)
-            .pointerInput(label) { detectTapGesturesCompat(onClick) },
+            .clickable(onClick = onClick),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         icon(active)
@@ -699,61 +521,4 @@ private fun BottomNavItem(
     }
 }
 
-@Composable
-private fun HomeGlyph(color: Color, modifier: Modifier = Modifier) {
-    Canvas(modifier = modifier) {
-        val stroke = 2.2.dp.toPx()
-        val path = Path().apply {
-            moveTo(size.width * 0.50f, size.height * 0.10f)
-            lineTo(size.width * 0.12f, size.height * 0.42f)
-            lineTo(size.width * 0.88f, size.height * 0.42f)
-            close()
-        }
-        drawPath(path, color)
-        drawRoundRect(
-            color = color,
-            topLeft = Offset(size.width * 0.22f, size.height * 0.42f),
-            size = androidx.compose.ui.geometry.Size(size.width * 0.56f, size.height * 0.46f),
-            cornerRadius = androidx.compose.ui.geometry.CornerRadius(3.dp.toPx()),
-            style = Stroke(width = stroke)
-        )
-    }
-}
-
-@Composable
-private fun ProfileGlyph(color: Color, modifier: Modifier = Modifier) {
-    Canvas(modifier = modifier) {
-        drawCircle(
-            color = color,
-            radius = size.minDimension * 0.20f,
-            center = Offset(size.width * 0.50f, size.height * 0.32f)
-        )
-        drawRoundRect(
-            color = color,
-            topLeft = Offset(size.width * 0.20f, size.height * 0.58f),
-            size = androidx.compose.ui.geometry.Size(size.width * 0.60f, size.height * 0.28f),
-            cornerRadius = androidx.compose.ui.geometry.CornerRadius(8.dp.toPx())
-        )
-    }
-}
-
 /** 底部导航中央扫描按钮：四角框 + 扫描线 */
-@Composable
-private fun ScanLineGlyph(color: Color, modifier: Modifier = Modifier) {
-    Canvas(modifier = modifier) {
-        val w = size.width
-        val h = size.height
-        val stroke = 2.4.dp.toPx()
-        val len = w * 0.22f
-        val m = w * 0.10f
-        drawLine(color, Offset(m, m + len), Offset(m, m), stroke, cap = StrokeCap.Round)
-        drawLine(color, Offset(m, m), Offset(m + len, m), stroke, cap = StrokeCap.Round)
-        drawLine(color, Offset(w - m - len, m), Offset(w - m, m), stroke, cap = StrokeCap.Round)
-        drawLine(color, Offset(w - m, m), Offset(w - m, m + len), stroke, cap = StrokeCap.Round)
-        drawLine(color, Offset(m, h - m - len), Offset(m, h - m), stroke, cap = StrokeCap.Round)
-        drawLine(color, Offset(m, h - m), Offset(m + len, h - m), stroke, cap = StrokeCap.Round)
-        drawLine(color, Offset(w - m - len, h - m), Offset(w - m, h - m), stroke, cap = StrokeCap.Round)
-        drawLine(color, Offset(w - m, h - m), Offset(w - m, h - m - len), stroke, cap = StrokeCap.Round)
-        drawLine(color, Offset(w * 0.20f, h * 0.5f), Offset(w * 0.80f, h * 0.5f), stroke, cap = StrokeCap.Round)
-    }
-}

@@ -32,6 +32,7 @@ import cn.yuandianai.juziscan.ui.theme.HpSmartColors
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import cn.yuandianai.juziscan.common.FireflyIconName
 
 @Composable
 fun WatermarkToolScreen(onBack: () -> Unit) {
@@ -87,7 +88,7 @@ fun WatermarkToolScreen(onBack: () -> Unit) {
 
         if (sourceBitmap == null) {
             ToolEmptyState(
-                imageRes = R.drawable.tool_watermark,
+                icon = FireflyIconName.Watermark,
                 title = "添加水印",
                 message = "选择一张图片后，可以快速加上业务办理、仅供使用等水印内容。",
                 actionText = "从相册选择",

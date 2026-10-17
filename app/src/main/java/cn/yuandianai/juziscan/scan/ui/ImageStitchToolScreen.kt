@@ -33,6 +33,7 @@ import cn.yuandianai.juziscan.ui.theme.HpSmartColors
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import cn.yuandianai.juziscan.common.FireflyIconName
 
 @Composable
 fun ImageStitchToolScreen(onBack: () -> Unit) {
@@ -80,7 +81,7 @@ fun ImageStitchToolScreen(onBack: () -> Unit) {
 
         if (stitchedBitmap == null && !isProcessing) {
             ToolEmptyState(
-                imageRes = R.drawable.tool_stitch,
+                icon = FireflyIconName.Stitch,
                 title = "长图拼接",
                 message = "一次选择多张图片，自动按顺序拼接成长图，适合聊天截图和内容归档。",
                 actionText = "从相册选择",

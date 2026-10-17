@@ -95,7 +95,7 @@ class DocumentStylesE2eTest {
             val sourceFiles = before.map { File(it.sourceImagePath!!) }
             val modified = sourceFiles.map { it.lastModified() }
             ready(); openRecord(record.id, record.title)
-            ui.onNodeWithText("···").performTouchInput { click() }
+            ui.onNodeWithContentDescription("更多操作").performTouchInput { click() }
             ui.onNodeWithText("编辑").performClick()
             ui.waitUntil(20_000) { ui.onAllNodesWithText("下一步").fetchSemanticsNodes().isNotEmpty() }
             ui.onNodeWithText("下一步").performClick()
@@ -109,7 +109,7 @@ class DocumentStylesE2eTest {
             instrumentation.runOnMainSync { ui.activity.onBackPressedDispatcher.onBackPressed() }
             instrumentation.runOnMainSync { ui.activity.onBackPressedDispatcher.onBackPressed() }
             assertEquals("color", repository.loadDocumentPages(record.id).first().imageStyle)
-            ui.onNodeWithText("···").performTouchInput { click() }
+            ui.onNodeWithContentDescription("更多操作").performTouchInput { click() }
             ui.onNodeWithText("编辑").performClick()
             ui.waitUntil(20_000) { ui.onAllNodesWithText("下一步").fetchSemanticsNodes().isNotEmpty() }
             ui.onNodeWithText("下一步").performClick()

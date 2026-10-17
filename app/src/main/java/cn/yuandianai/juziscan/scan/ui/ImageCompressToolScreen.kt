@@ -33,6 +33,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.ByteArrayOutputStream
+import cn.yuandianai.juziscan.common.FireflyIconName
 
 @Composable
 fun ImageCompressToolScreen(onBack: () -> Unit) {
@@ -101,7 +102,7 @@ fun ImageCompressToolScreen(onBack: () -> Unit) {
 
         if (sourceBitmap == null && !isProcessing) {
             ToolEmptyState(
-                imageRes = R.drawable.tool_compress,
+                icon = FireflyIconName.Compress,
                 title = "图片压缩",
                 message = "选择图片后可调整压缩等级，平衡清晰度和文件体积，发图更轻松。",
                 actionText = "从相册选择",

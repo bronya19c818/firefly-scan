@@ -47,6 +47,7 @@ import com.google.zxing.common.HybridBinarizer
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import cn.yuandianai.juziscan.common.FireflyIconName
 
 @Composable
 fun QrCodeToolScreen(onBack: () -> Unit) {
@@ -107,7 +108,7 @@ private fun GenerateQrCodeView() {
     ) {
         if (generatedQrCode == null) {
             ToolIntroCard(
-                imageRes = R.drawable.tool_qrcode,
+                icon = FireflyIconName.QrCode,
                 title = "生成二维码",
                 message = "输入文本、链接或联系方式，马上生成可保存可分享的二维码。"
             )
@@ -252,7 +253,7 @@ private fun DecodeQrCodeView() {
     ) {
         if (selectedBitmap == null) {
             ToolIntroCard(
-                imageRes = R.drawable.tool_qrcode,
+                icon = FireflyIconName.QrCode,
                 title = "识别二维码",
                 message = "从相册选择带二维码的图片，自动识别内容并支持一键复制。"
             )

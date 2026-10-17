@@ -84,7 +84,7 @@ fun PreviewResultScreen(
                     onClick = onAdd,
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    PlusIcon(color = HpSmartColors.TextPrimary, modifier = Modifier.size(16.dp))
+                    PlusIcon(color = HpSmartColors.TextPrimary, modifier = Modifier.size(20.dp))
                 }
             }
 
@@ -95,7 +95,7 @@ fun PreviewResultScreen(
                         onClick = onReorder,
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        ReorderIcon(color = HpSmartColors.TextPrimary, modifier = Modifier.size(16.dp))
+                        ReorderIcon(color = HpSmartColors.TextPrimary, modifier = Modifier.size(20.dp))
                     }
                 }
             }
@@ -106,7 +106,7 @@ fun PreviewResultScreen(
                     onClick = onRotate,
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    RotateArrowIcon(color = HpSmartColors.TextPrimary, modifier = Modifier.size(16.dp))
+                    RotateArrowIcon(color = HpSmartColors.TextPrimary, modifier = Modifier.size(20.dp))
                 }
             }
         }
@@ -278,11 +278,11 @@ private fun PopupMenuCard(
             .border(1.dp, Color(0xFFE5E6F2), RoundedCornerShape(12.dp))
             .padding(vertical = 4.dp)
     ) {
-        PopupMenuItem(text = "编辑", icon = { PencilIcon(color = HpSmartColors.Accent, modifier = Modifier.size(16.dp)) }, onClick = onEdit)
+        PopupMenuItem(text = "编辑", icon = { PencilIcon(color = HpSmartColors.Accent, modifier = Modifier.size(20.dp)) }, onClick = onEdit)
         DividerHorizontal()
-        PopupMenuItem(text = "更换", icon = { ReplaceArrowsIcon(color = HpSmartColors.Accent, modifier = Modifier.size(16.dp)) }, onClick = onReplace)
+        PopupMenuItem(text = "更换", icon = { ReplaceArrowsIcon(color = HpSmartColors.Accent, modifier = Modifier.size(20.dp)) }, onClick = onReplace)
         DividerHorizontal()
-        PopupMenuItem(text = "删除", icon = { TrashBinIcon(color = HpSmartColors.Accent, modifier = Modifier.size(16.dp)) }, onClick = onDelete)
+        PopupMenuItem(text = "删除", icon = { TrashBinIcon(color = HpSmartColors.Accent, modifier = Modifier.size(20.dp)) }, onClick = onDelete)
     }
 }
 
