@@ -90,7 +90,7 @@ class PageProcessingQueue(
                 when {
                     outcome.isSuccess -> {
                         val processed = outcome.getOrThrow()
-                        if (processed != null) {
+                        if (processed != null && pageProvider(pageId)?.hasSameProcessingParameters(processed) == true) {
                             onPhaseChanged(pageId, PageProcessingPhase.READY)
                             onPageProcessed(processed)
                         } else {

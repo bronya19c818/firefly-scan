@@ -1,0 +1,177 @@
+[
+  {
+    "input": "363c5e1a-82e2-4408-86b1-eace048f7239.png",
+    "style": "original",
+    "elapsedMs": 654,
+    "width": 1055,
+    "height": 1491
+  },
+  {
+    "input": "363c5e1a-82e2-4408-86b1-eace048f7239.png",
+    "style": "color",
+    "elapsedMs": 967,
+    "width": 1055,
+    "height": 1491
+  },
+  {
+    "input": "363c5e1a-82e2-4408-86b1-eace048f7239.png",
+    "style": "white",
+    "elapsedMs": 1462,
+    "width": 1055,
+    "height": 1491
+  },
+  {
+    "input": "363c5e1a-82e2-4408-86b1-eace048f7239.png",
+    "style": "grayscale",
+    "elapsedMs": 691,
+    "width": 1055,
+    "height": 1491
+  },
+  {
+    "input": "363c5e1a-82e2-4408-86b1-eace048f7239.png",
+    "style": "bw",
+    "elapsedMs": 199,
+    "width": 1055,
+    "height": 1491
+  },
+  {
+    "input": "3a5bb3f1-a0b9-4bb9-9fce-4fe9b3191c9b.png",
+    "style": "original",
+    "elapsedMs": 1373,
+    "width": 1055,
+    "height": 1491
+  },
+  {
+    "input": "3a5bb3f1-a0b9-4bb9-9fce-4fe9b3191c9b.png",
+    "style": "color",
+    "elapsedMs": 1422,
+    "width": 1055,
+    "height": 1491
+  },
+  {
+    "input": "3a5bb3f1-a0b9-4bb9-9fce-4fe9b3191c9b.png",
+    "style": "white",
+    "elapsedMs": 1487,
+    "width": 1055,
+    "height": 1491
+  },
+  {
+    "input": "3a5bb3f1-a0b9-4bb9-9fce-4fe9b3191c9b.png",
+    "style": "grayscale",
+    "elapsedMs": 652,
+    "width": 1055,
+    "height": 1491
+  },
+  {
+    "input": "3a5bb3f1-a0b9-4bb9-9fce-4fe9b3191c9b.png",
+    "style": "bw",
+    "elapsedMs": 197,
+    "width": 1055,
+    "height": 1491
+  },
+  {
+    "input": "62979813-8e32-4866-89c0-3a58c29014ed.png",
+    "style": "original",
+    "elapsedMs": 1310,
+    "width": 1055,
+    "height": 1491
+  },
+  {
+    "input": "62979813-8e32-4866-89c0-3a58c29014ed.png",
+    "style": "color",
+    "elapsedMs": 1346,
+    "width": 1055,
+    "height": 1491
+  },
+  {
+    "input": "62979813-8e32-4866-89c0-3a58c29014ed.png",
+    "style": "white",
+    "elapsedMs": 1420,
+    "width": 1055,
+    "height": 1491
+  },
+  {
+    "input": "62979813-8e32-4866-89c0-3a58c29014ed.png",
+    "style": "grayscale",
+    "elapsedMs": 580,
+    "width": 1055,
+    "height": 1491
+  },
+  {
+    "input": "62979813-8e32-4866-89c0-3a58c29014ed.png",
+    "style": "bw",
+    "elapsedMs": 210,
+    "width": 1055,
+    "height": 1491
+  },
+  {
+    "input": "7d321dbb-b7c9-4978-bc8c-f13c298cc7d9.png",
+    "style": "original",
+    "elapsedMs": 1148,
+    "width": 1055,
+    "height": 1491
+  },
+  {
+    "input": "7d321dbb-b7c9-4978-bc8c-f13c298cc7d9.png",
+    "style": "color",
+    "elapsedMs": 1226,
+    "width": 1055,
+    "height": 1491
+  },
+  {
+    "input": "7d321dbb-b7c9-4978-bc8c-f13c298cc7d9.png",
+    "style": "white",
+    "elapsedMs": 1307,
+    "width": 1055,
+    "height": 1491
+  },
+  {
+    "input": "7d321dbb-b7c9-4978-bc8c-f13c298cc7d9.png",
+    "style": "grayscale",
+    "elapsedMs": 599,
+    "width": 1055,
+    "height": 1491
+  },
+  {
+    "input": "7d321dbb-b7c9-4978-bc8c-f13c298cc7d9.png",
+    "style": "bw",
+    "elapsedMs": 199,
+    "width": 1055,
+    "height": 1491
+  },
+  {
+    "input": "9fc56d02-4d9d-4c44-afd9-dab5fdac459d.png",
+    "style": "original",
+    "elapsedMs": 1315,
+    "width": 1055,
+    "height": 1491
+  },
+  {
+    "input": "9fc56d02-4d9d-4c44-afd9-dab5fdac459d.png",
+    "style": "color",
+    "elapsedMs": 1251,
+    "width": 1055,
+    "height": 1491
+  },
+  {
+    "input": "9fc56d02-4d9d-4c44-afd9-dab5fdac459d.png",
+    "style": "white",
+    "elapsedMs": 1290,
+    "width": 1055,
+    "height": 1491
+  },
+  {
+    "input": "9fc56d02-4d9d-4c44-afd9-dab5fdac459d.png",
+    "style": "grayscale",
+    "elapsedMs": 611,
+    "width": 1055,
+    "height": 1491
+  },
+  {
+    "input": "9fc56d02-4d9d-4c44-afd9-dab5fdac459d.png",
+    "style": "bw",
+    "elapsedMs": 207,
+    "width": 1055,
+    "height": 1491
+  }
+]

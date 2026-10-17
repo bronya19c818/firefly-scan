@@ -20,6 +20,8 @@ import java.util.UUID
  * @param onIntermediate 透视矫正完成后、图像增强之前的中间结果回调（渐进预览）。
  *   回调在调用方线程执行，调用方需自行切回主线程再更新界面。
  */
+// Full-resolution decodes and native Mats share one memory budget across queues and exports.
+@Synchronized
 fun processDocumentPage(
     context: Context,
     page: ScannedPage,
@@ -71,7 +73,8 @@ fun processDocumentPage(
             runCatching { onIntermediate(page.copy(previewBitmap = cropPreview)) }
                 .onFailure { android.util.Log.w("JuZiScan", "Could not publish crop preview", it) }
         }
-        processed = SimpleDocumentScanner.enhanceDocument(corrected)
+        processed = if (page.imageStyle == "default") SimpleDocumentScanner.enhanceDocument(corrected)
+        else cn.yuandianai.juziscan.scanner.DocumentStyleProcessor.apply(corrected, DocumentImageStyle.parse(page.imageStyle))
         val previewImage = preparePreviewBitmap(processed, 640)
         preview = previewImage
         val output = processedOutput ?: createTempProcessedFile(context)

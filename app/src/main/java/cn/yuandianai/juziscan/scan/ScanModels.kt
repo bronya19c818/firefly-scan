@@ -10,6 +10,7 @@ enum class ScanStage {
     Home,
     Capture,
     EdgeReview,
+    ImageProcessing,
     Preview,
     Reorder,
     ShareSave,
@@ -110,7 +111,7 @@ data class ScannedPage(
     val processedImagePath: String? = null,
     val detectedQuad: List<PointF> = emptyList(),
     val contentRevision: String = java.util.UUID.randomUUID().toString(),
-    val imageStyle: String = "default"
+    val imageStyle: String = "color"
 ) {
     val isProcessed: Boolean get() = processedBitmap != null || processedImagePath != null
 

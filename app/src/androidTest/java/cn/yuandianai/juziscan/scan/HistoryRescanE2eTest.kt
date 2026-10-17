@@ -128,6 +128,8 @@ class HistoryRescanE2eTest {
             ui.waitUntil(60_000) { ui.onAllNodesWithText("铺满").fetchSemanticsNodes().isNotEmpty() }
             ui.onNodeWithText("铺满").performTouchInput { click() }
             ui.onNodeWithText("下一步").performTouchInput { click() }
+            ui.onNodeWithText("图片处理").assertExists()
+            ui.onNodeWithText("完成").performTouchInput { click() }
             ui.waitUntil(60_000) { repository.loadRecords().first { it.id == record.id }.updatedAtMillis > beforeCancel.updatedAtMillis }
             val edited = repository.loadDocumentPages(record.id)
             assertEquals(ordered, edited.map { it.id })

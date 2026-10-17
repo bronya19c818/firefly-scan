@@ -57,9 +57,7 @@ class DocumentSaveCoordinator private constructor(context: Context) {
         fun applyCache(result: ScannedPage, final: Boolean) {
             if (repository.isDocumentDeleted(id)) { releaseIfIdle(); return }
             state = state.copy(pages = state.pages.map { current ->
-                if (current.id == result.id && current.contentRevision == result.contentRevision &&
-                    current.editableQuad.map { it.x to it.y } == result.editableQuad.map { it.x to it.y } &&
-                    current.correctionMode == result.correctionMode && current.imageStyle == result.imageStyle) {
+                if (current.hasSameProcessingParameters(result)) {
                     current.copy(previewBitmap = result.previewBitmap,
                         processedImagePath = if (final) result.processedImagePath else current.processedImagePath,
                         detectedQuad = if (final) result.detectedQuad else current.detectedQuad)
@@ -192,7 +190,7 @@ class DocumentSaveCoordinator private constructor(context: Context) {
             state.copy(pages = state.pages.map { page ->
                 val ready = cached[page.id]
                 if (!page.hasProcessedOutput && ready?.hasProcessedOutput == true &&
-                    ready.contentRevision == page.contentRevision) {
+                    ready.hasSameProcessingParameters(page)) {
                     page.copy(processedImagePath = ready.processedImagePath, previewBitmap = ready.previewBitmap,
                         detectedQuad = ready.detectedQuad)
                 } else page
